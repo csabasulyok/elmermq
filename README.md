@@ -1,20 +1,15 @@
 # ElmerMQ
 
-Multi-protocol TypeScript RabbitMQ client wrapper
-
-Install with:
+Hunting the RabbitMQ - amqplib wrapper with auto-reconnect and channel pooling
 
 ```bash
 npm i elmermq
 ```
 
-## Functionalities
+*[ElmerMQ](https://github.com/csabasulyok/elmermq)* is a wrapper around [amqplib](https://amqp-node.github.io/amqplib/) with some added functionalities:
 
-- Supports the multiple protocols of RabbitMQ
-- Allows (partial) access to the RabbitMQ API
-- Auto-reconnect
-- Decorator-driven
-
-## Usage
-
-TODO
+- Auto-reconnect with auto-resubscribe to any queues
+- Channel pooling with round-robin selection
+- Pausing/resuming subscriptions
+- Automatic processing of JSON messages
+- Externalization via [extol](https://github.com/csabasulyok/extol)
