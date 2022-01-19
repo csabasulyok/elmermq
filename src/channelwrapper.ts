@@ -10,6 +10,7 @@ import Queue from './queue';
  */
 export type ChannelSubscription = {
   consumerTag: string;
+  source: string;
   resubscribe: () => Promise<string>;
   active: boolean;
 };
@@ -31,7 +32,7 @@ export type PublishMessage<T> = {
  */
 export default class ChannelWithRetention {
   private channel: Channel;
-  private subscriptions: ChannelSubscription[];
+  private subscriptions: Record<string, ChannelSubscription>;
   private backedUpQueue: Queue<PublishMessage<unknown>>;
 
   name: string;
@@ -40,7 +41,7 @@ export default class ChannelWithRetention {
   constructor(name: string) {
     this.name = name;
     this.connected = false;
-    this.subscriptions = [];
+    this.subscriptions = {};
     this.backedUpQueue = new Queue();
     autoBind(this);
   }
@@ -55,7 +56,11 @@ export default class ChannelWithRetention {
 
     this.connected = true;
     // if this is a reconnection, reconnect all previously active subscriptions
-    await Promise.all(this.subscriptions.filter((s) => s?.active).map((s) => s?.resubscribe()));
+    await Promise.all(
+      Object.values(this.subscriptions)
+        .filter((s) => s?.active)
+        .map((s) => s?.resubscribe()),
+    );
     // if this is a reconnection, send out any messages queued up while disconnected
     while (this.backedUpQueue.backedUp) {
       this.publish(this.backedUpQueue.consume());
@@ -163,16 +168,17 @@ export default class ChannelWithRetention {
     // assert queue with given parameters
     await this.channel.assertQueue(queue, options?.assert);
     // build callback
-    const response = await this.addConsumer(queue, callback, options?.consume);
+    const { consumerTag } = await this.addConsumer(queue, callback, options?.consume);
     // register subscription so resubscription is possible with other connection/channel
-    this.subscriptions.push({
-      consumerTag: response.consumerTag,
+    this.subscriptions[consumerTag] = {
+      consumerTag,
+      source: queue,
       active: true,
       resubscribe: () => this.onQueueMessage(queue, callback, options),
-    });
+    };
 
     yall.info(`Subscribed to messages from queue ${queue}`);
-    return response.consumerTag;
+    return consumerTag;
   }
 
   async onFanoutMessage<T>(fanout: string, callback: MessageCallback<T>, options?: OnExchangeOptions): Promise<string> {
@@ -183,16 +189,17 @@ export default class ChannelWithRetention {
     await this.channel.assertQueue(queue, { exclusive: true, autoDelete: true });
     await this.channel.bindQueue(queue, fanout, '');
     // build callback
-    const response = await this.addConsumer(queue, callback, options?.consume);
+    const { consumerTag } = await this.addConsumer(queue, callback, options?.consume);
     // register subscription so resubscription is possible with other connection/channel
-    this.subscriptions.push({
-      consumerTag: response.consumerTag,
+    this.subscriptions[consumerTag] = {
+      consumerTag,
+      source: fanout,
       active: true,
       resubscribe: () => this.onFanoutMessage(fanout, callback, options),
-    });
+    };
 
     yall.info(`Subscribed to fanout ${fanout} via temp queue ${queue}`);
-    return response.consumerTag;
+    return consumerTag;
   }
 
   async onTopicMessage<T>(topic: string, pattern: string, callback: MessageCallback<T>, options?: OnExchangeOptions): Promise<string> {
@@ -203,16 +210,17 @@ export default class ChannelWithRetention {
     await this.channel.assertQueue(queue, { exclusive: true, autoDelete: true });
     await this.channel.bindQueue(queue, topic, pattern);
     // build callback
-    const response = await this.addConsumer(queue, callback, options?.consume);
+    const { consumerTag } = await this.addConsumer(queue, callback, options?.consume);
     // register subscription so resubscription is possible with other connection/channel
-    this.subscriptions.push({
-      consumerTag: response.consumerTag,
+    this.subscriptions[consumerTag] = {
+      consumerTag,
+      source: topic,
       active: true,
       resubscribe: () => this.onFanoutMessage(topic, callback, options),
-    });
+    };
 
     yall.info(`Subscribed to topic ${topic}:${pattern} via temp queue ${queue}`);
-    return response.consumerTag;
+    return consumerTag;
   }
 
   //
@@ -262,5 +270,62 @@ export default class ChannelWithRetention {
       message,
       options,
     });
+  }
+
+  //
+  // Pausing/resuming
+  //
+
+  isListenerActive(consumerTag: string): boolean {
+    return this.subscriptions[consumerTag]?.active;
+  }
+
+  async pauseListener(consumerTag: string): Promise<boolean> {
+    if (!(consumerTag in this.subscriptions)) {
+      yall.warn(`Trying to pause non-existent subscription ${consumerTag}`);
+      return false;
+    }
+
+    const { source, active } = this.subscriptions[consumerTag];
+
+    if (!active) {
+      yall.warn(`Trying to pause already paused subscription ${source}`);
+      return false;
+    }
+
+    yall.info(`Unsubscribing from ${source} (tag ${consumerTag})`);
+    await this.channel.cancel(consumerTag);
+    this.subscriptions[consumerTag].active = false;
+    return true;
+  }
+
+  async resumeListener(consumerTag: string): Promise<string> {
+    if (!(consumerTag in this.subscriptions)) {
+      yall.warn(`Trying to resume non-existent subscription ${consumerTag}`);
+      return undefined;
+    }
+
+    const { source, active } = this.subscriptions[consumerTag];
+
+    if (active) {
+      yall.warn(`Trying to resume already active subscription to ${source}`);
+      return undefined;
+    }
+
+    yall.info(`Resubscribing to ${source}`);
+    const newConsumerTag = await this.subscriptions[consumerTag].resubscribe();
+    delete this.subscriptions[consumerTag];
+    return newConsumerTag;
+  }
+
+  async stopListener(consumerTag: string): Promise<boolean> {
+    if (!(consumerTag in this.subscriptions)) {
+      yall.warn(`Trying to stop listening on non-existent subscription ${consumerTag}`);
+      return false;
+    }
+
+    await this.channel.cancel(consumerTag);
+    delete this.subscriptions[consumerTag];
+    return true;
   }
 }

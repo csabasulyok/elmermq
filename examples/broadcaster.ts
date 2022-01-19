@@ -16,17 +16,19 @@ type MyDto = {
 
   setInterval(() => {
     // automatic JSON serialization when publishing
+    console.log('Sending message to my_queue');
     conn.publishToQueue<MyDto>('my_queue', {
       name: 'Hello',
       age: 42,
     });
-  }, 5000);
+  }, 2000);
 
   setInterval(() => {
     // automatic JSON serialization when publishing
+    console.log('Sending message to my_fanout');
     conn.publishToFanout<MyDto>('my_fanout', {
       name: 'Hello',
       age: 42,
     });
-  }, 10000);
+  }, 7500);
 })();

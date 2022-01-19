@@ -184,4 +184,13 @@ export default interface ElmerConnection {
   publishToQueue<T>(queue: string, message: T, options?: PublishOptions): boolean;
   publishToFanout<T>(fanout: string, message: T, options?: PublishOptions): boolean;
   publishToTopic<T>(topic: string, routingKey: string, message: T, options?: PublishOptions): boolean;
+
+  //
+  // Pausing/resuming
+  //
+
+  isListenerActive(subscription: ChannelPoolSubscription): boolean;
+  pauseListener(subscription: ChannelPoolSubscription): Promise<boolean>;
+  resumeListener(subscription: ChannelPoolSubscription): Promise<ChannelPoolSubscription>;
+  stopListener(subscription: ChannelPoolSubscription): Promise<boolean>;
 }

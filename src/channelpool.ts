@@ -123,4 +123,34 @@ export default class ChannelPool {
   publishToTopic<T>(topic: string, routingKey: string, message: T, options?: PublishOptions): boolean {
     return this.getChannel().publishToTopic(topic, routingKey, message, options);
   }
+
+  //
+  // Pausing/resuming
+  //
+
+  isListenerActive(subscription: ChannelPoolSubscription): boolean {
+    const channel = this.channels[subscription.channelName];
+    return channel?.isListenerActive(subscription.consumerTag);
+  }
+
+  async pauseListener(subscription: ChannelPoolSubscription): Promise<boolean> {
+    const channel = this.channels[subscription.channelName];
+    const ret = await channel?.pauseListener(subscription.consumerTag);
+    return ret;
+  }
+
+  async resumeListener(subscription: ChannelPoolSubscription): Promise<ChannelPoolSubscription> {
+    const channel = this.channels[subscription.channelName];
+    const newConsumerTag = await channel?.resumeListener(subscription.consumerTag);
+    return {
+      channelName: subscription.channelName,
+      consumerTag: newConsumerTag,
+    };
+  }
+
+  async stopListener(subscription: ChannelPoolSubscription): Promise<boolean> {
+    const channel = this.channels[subscription.channelName];
+    const ret = await channel?.stopListener(subscription.consumerTag);
+    return ret;
+  }
 }

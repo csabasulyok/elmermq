@@ -248,4 +248,27 @@ export default class ElmerConnectionImpl implements ElmerConnection {
   publishToTopic<T>(topic: string, routingKey: string, message: T, options?: PublishOptions): boolean {
     return this.channelPool.publishToTopic(topic, routingKey, message, options);
   }
+
+  //
+  // Pausing/resuming
+  //
+
+  isListenerActive(subscription: ChannelPoolSubscription): boolean {
+    return this.channelPool.isListenerActive(subscription);
+  }
+
+  async pauseListener(subscription: ChannelPoolSubscription): Promise<boolean> {
+    const ret = await this.channelPool.pauseListener(subscription);
+    return ret;
+  }
+
+  async resumeListener(subscription: ChannelPoolSubscription): Promise<ChannelPoolSubscription> {
+    const ret = await this.channelPool.resumeListener(subscription);
+    return ret;
+  }
+
+  async stopListener(subscription: ChannelPoolSubscription): Promise<boolean> {
+    const ret = await this.channelPool.stopListener(subscription);
+    return ret;
+  }
 }
