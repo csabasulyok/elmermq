@@ -1,10 +1,5 @@
 import connect from '../src';
-
-// message format we expect on a queue
-type MyDto = {
-  name: string;
-  age: number;
-};
+import { MyDto } from './dto';
 
 (async () => {
   // connect with same parameters as amqplib
@@ -14,21 +9,37 @@ type MyDto = {
     poolSize: 4,
   });
 
+  // assertions directly through connection
+  // use channel pool in the background
+  await conn.assertQueue('my_queue');
+  await conn.assertExchange('my_fanout', 'fanout');
+
+  let queueIdx = 0;
   setInterval(() => {
-    // automatic JSON serialization when publishing
-    console.log('Sending message to my_queue');
-    conn.publishToQueue<MyDto>('my_queue', {
-      name: 'Hello',
+    const message: MyDto = {
+      idx: queueIdx,
+      name: 'Hello to queue',
       age: 42,
-    });
+      date: new Date(),
+    };
+    queueIdx += 1;
+
+    // automatic JSON serialization when publishing
+    conn.sendToQueue('my_queue', message);
+    console.log('my_queue <-', message);
   }, 2000);
 
+  let fanoutIdx = 0;
   setInterval(() => {
-    // automatic JSON serialization when publishing
-    console.log('Sending message to my_fanout');
-    conn.publishToFanout<MyDto>('my_fanout', {
-      name: 'Hello',
+    const message: MyDto = {
+      idx: fanoutIdx,
+      name: 'Hello to fanout',
       age: 42,
-    });
+      date: new Date(),
+    };
+    fanoutIdx += 1;
+
+    conn.publish('my_fanout', undefined, message);
+    console.log('my_fanout <-', message);
   }, 7500);
 })();

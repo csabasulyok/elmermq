@@ -1,7 +1,7 @@
 import { Connection, Channel, ConsumeMessage, Options, Replies } from 'amqplib';
 import yall from 'yall2';
 import autoBind from 'auto-bind';
-import { ConsumeOptions, ChannelMessageCallback, OnExchangeOptions, OnQueueOptions, PublishOptions } from './api';
+import { ConsumeOptions, ChannelMessageCallback, PublishOptions } from './api';
 import id from './util';
 import Queue from './queue';
 
@@ -20,7 +20,7 @@ export type ChannelSubscription = {
  * Can be queued and left to be sent out later if channel disconnects.
  */
 export type PublishMessage<T> = {
-  destination?: string;
+  exchange?: string;
   routingKey: string;
   message: T;
   options?: PublishOptions;
@@ -63,7 +63,8 @@ export default class ChannelWithRetention {
     );
     // if this is a reconnection, send out any messages queued up while disconnected
     while (this.backedUpQueue.backedUp) {
-      this.publish(this.backedUpQueue.consume());
+      const { exchange, routingKey, message, options } = this.backedUpQueue.consume();
+      this.publish(exchange, routingKey, message, options);
     }
   }
 
@@ -161,131 +162,57 @@ export default class ChannelWithRetention {
   }
 
   //
-  // Helpers for different queue/exchange types
+  // Consume/publish methods
   //
 
-  async onQueueMessage<T>(queue: string, callback: ChannelMessageCallback<T>, options?: OnQueueOptions): Promise<string> {
-    // assert queue with given parameters
-    await this.channel.assertQueue(queue, options?.assert);
+  async consumeQueue<T>(queue: string, callback: ChannelMessageCallback<T>, options?: ConsumeOptions): Promise<string> {
     // build callback
-    const { consumerTag } = await this.addConsumer(queue, callback, options?.consume);
+    const { consumerTag } = await this.addConsumer(queue, callback, options);
     // register subscription so resubscription is possible with other connection/channel
     this.subscriptions[consumerTag] = {
       consumerTag,
       source: queue,
       active: true,
-      resubscribe: () => this.onQueueMessage(queue, callback, options),
+      resubscribe: () => this.consumeQueue(queue, callback, options),
     };
 
     yall.info(`Subscribed to messages from queue ${queue}`);
     return consumerTag;
   }
 
-  async onFanoutMessage<T>(fanout: string, callback: ChannelMessageCallback<T>, options?: OnExchangeOptions): Promise<string> {
-    // assert fanout
-    await this.channel.assertExchange(fanout, 'fanout', options?.assert);
+  async consume<T>(exchange: string, pattern: string, callback: ChannelMessageCallback<T>, options?: ConsumeOptions): Promise<string> {
     // assert temporary queue with given parameters
-    const queue = `${fanout}-${id()}`;
+    const queue = `${exchange}-${id()}`;
     await this.channel.assertQueue(queue, { exclusive: true, autoDelete: true });
-    await this.channel.bindQueue(queue, fanout, '');
+    await this.channel.bindQueue(queue, exchange, pattern);
     // build callback
-    const { consumerTag } = await this.addConsumer(queue, callback, options?.consume);
+    const { consumerTag } = await this.addConsumer(queue, callback, options);
     // register subscription so resubscription is possible with other connection/channel
     this.subscriptions[consumerTag] = {
       consumerTag,
-      source: fanout,
+      source: exchange,
       active: true,
-      resubscribe: () => this.onFanoutMessage(fanout, callback, options),
+      resubscribe: () => this.consume(exchange, pattern, callback, options),
     };
 
-    yall.info(`Subscribed to fanout ${fanout} via temp queue ${queue}`);
+    yall.info(`Subscribed to exchange ${exchange}:${pattern} via temp queue ${queue}`);
     return consumerTag;
   }
 
-  async onTopicMessage<T>(
-    topic: string,
-    pattern: string,
-    callback: ChannelMessageCallback<T>,
-    options?: OnExchangeOptions,
-  ): Promise<string> {
-    // assert fanout
-    await this.channel.assertExchange(topic, 'topic', options?.assert);
-    // assert temporary queue with given parameters
-    const queue = `${topic}-${id()}`;
-    await this.channel.assertQueue(queue, { exclusive: true, autoDelete: true });
-    await this.channel.bindQueue(queue, topic, pattern);
-    // build callback
-    const { consumerTag } = await this.addConsumer(queue, callback, options?.consume);
-    // register subscription so resubscription is possible with other connection/channel
-    this.subscriptions[consumerTag] = {
-      consumerTag,
-      source: topic,
-      active: true,
-      resubscribe: () => this.onFanoutMessage(topic, callback, options),
-    };
-
-    yall.info(`Subscribed to topic ${topic}:${pattern} via temp queue ${queue}`);
-    return consumerTag;
-  }
-
-  //
-  // Common convenience method for publishing a message
-  //
-
-  private publish<T>(publishMessage: PublishMessage<T>): boolean {
-    const { destination, routingKey, message, options } = publishMessage;
+  publish<T>(exchange: string, routingKey: string, message: T, options?: PublishOptions): boolean {
     const body = options?.raw ? (message as unknown as Buffer) : Buffer.from(JSON.stringify(message));
 
     // if connected, send directly
     if (this.connected) {
-      if (!destination) {
+      if (!exchange) {
         return this.channel.sendToQueue(routingKey, body, options);
       }
-      return this.channel.publish(destination, routingKey, body, options);
+      return this.channel.publish(exchange, routingKey, body, options);
     }
 
     // disconnected - will try to reconnect, in the meantime queue up message
-    this.backedUpQueue.push(publishMessage);
+    this.backedUpQueue.push({ exchange, routingKey, message, options });
     return true;
-  }
-
-  //
-  // Helpers for different queue/exchange types
-  //
-
-  publishToQueue<T>(queue: string, message: T, options?: PublishOptions): boolean {
-    return this.publish({
-      routingKey: queue,
-      message,
-      options,
-    });
-  }
-
-  publishToDirect<T>(direct: string, routingKey: string, message: T, options?: PublishOptions): boolean {
-    return this.publish({
-      destination: direct,
-      routingKey,
-      message,
-      options,
-    });
-  }
-
-  publishToFanout<T>(fanout: string, message: T, options?: PublishOptions): boolean {
-    return this.publish({
-      destination: fanout,
-      routingKey: '',
-      message,
-      options,
-    });
-  }
-
-  publishToTopic<T>(topic: string, routingKey: string, message: T, options?: PublishOptions): boolean {
-    return this.publish({
-      destination: topic,
-      routingKey,
-      message,
-      options,
-    });
   }
 
   //

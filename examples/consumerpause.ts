@@ -1,13 +1,8 @@
 import { promisify } from 'util';
 import connect from '../src';
+import { MyDto } from './dto';
 
 const sleep = promisify((timeout: number, callback: () => void) => setTimeout(callback, timeout));
-
-// message format we expect on a queue
-type MyDto = {
-  name: string;
-  age: number;
-};
 
 (async () => {
   const conn = await connect({
@@ -15,7 +10,9 @@ type MyDto = {
     poolSize: 4,
   });
 
-  let sub = await conn.onQueueMessage<MyDto>('my_queue', (message: MyDto) => {
+  await conn.assertQueue('my_queue');
+
+  let sub = await conn.consumeQueue<MyDto>('my_queue', (message: MyDto) => {
     console.log('my_queue ->', message);
   });
 

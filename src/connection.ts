@@ -8,11 +8,10 @@ import ElmerConnection, {
   CloseCallback,
   ConnectCallback,
   ConnectOptions,
+  ConsumeOptions,
   ErrorCallback,
   extolConnectOptions,
   MessageCallback,
-  OnExchangeOptions,
-  OnQueueOptions,
   PublishOptions,
 } from './api';
 import { MessageBrokerSubscription } from './subscription';
@@ -214,50 +213,31 @@ export default class ElmerConnectionImpl implements ElmerConnection {
     return ret;
   }
 
-  //
-  // Message handling
-  //
-
-  async onQueueMessage<T>(queue: string, callback: MessageCallback<T>, options?: OnQueueOptions): Promise<ChannelPoolSubscription> {
+  async consumeQueue<T>(queue: string, callback: MessageCallback<T>, options?: ConsumeOptions): Promise<ChannelPoolSubscription> {
     const decoratedCallback: ChannelMessageCallback<T> = (message: T, properties?: MessageProperties) =>
       callback(message, this, properties);
-    const ret = await this.channelPool.onQueueMessage(queue, decoratedCallback, options);
+    const ret = await this.channelPool.consumeQueue(queue, decoratedCallback, options);
     return ret;
   }
 
-  async onFanoutMessage<T>(fanout: string, callback: MessageCallback<T>, options?: OnExchangeOptions): Promise<ChannelPoolSubscription> {
-    const decoratedCallback: ChannelMessageCallback<T> = (message: T, properties?: MessageProperties) =>
-      callback(message, this, properties);
-    const ret = await this.channelPool.onFanoutMessage(fanout, decoratedCallback, options);
-    return ret;
-  }
-
-  async onTopicMessage<T>(
-    topic: string,
+  async consume<T>(
+    exchange: string,
     pattern: string,
     callback: MessageCallback<T>,
-    options?: OnExchangeOptions,
+    options?: ConsumeOptions,
   ): Promise<ChannelPoolSubscription> {
     const decoratedCallback: ChannelMessageCallback<T> = (message: T, properties?: MessageProperties) =>
       callback(message, this, properties);
-    const ret = await this.channelPool.onTopicMessage(topic, pattern, decoratedCallback, options);
+    const ret = await this.channelPool.consume(exchange, pattern, decoratedCallback, options);
     return ret;
   }
 
-  publishToQueue<T>(queue: string, message: T, options?: PublishOptions): boolean {
-    return this.channelPool.publishToQueue(queue, message, options);
+  sendToQueue<T>(queue: string, message: T, options?: PublishOptions): boolean {
+    return this.channelPool.publish('', queue, message, options);
   }
 
-  publishToDirect<T>(direct: string, routingKey: string, message: T, options?: PublishOptions): boolean {
-    return this.channelPool.publishToDirect(direct, routingKey, message, options);
-  }
-
-  publishToFanout<T>(fanout: string, message: T, options?: PublishOptions): boolean {
-    return this.channelPool.publishToFanout(fanout, message, options);
-  }
-
-  publishToTopic<T>(topic: string, routingKey: string, message: T, options?: PublishOptions): boolean {
-    return this.channelPool.publishToTopic(topic, routingKey, message, options);
+  publish<T>(exchange: string, routingKey: string, message: T, options?: PublishOptions): boolean {
+    return this.channelPool.publish(exchange, routingKey, message, options);
   }
 
   //

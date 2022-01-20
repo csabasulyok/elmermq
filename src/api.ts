@@ -102,28 +102,6 @@ export type PublishOptions = Options.Publish & {
   raw?: boolean;
 };
 
-export type OnQueueOptions = {
-  /**
-   * Options to use when asserting queue we will listen on
-   */
-  assert?: Options.AssertQueue;
-  /**
-   * Options to use when beginning consume process
-   */
-  consume?: ConsumeOptions;
-};
-
-export type OnExchangeOptions = {
-  /**
-   * Options to use when asserting queue we will listen on
-   */
-  assert?: Options.AssertExchange;
-  /**
-   * Options to use when beginning consume process
-   */
-  consume?: ConsumeOptions;
-};
-
 /**
  * Return key so that client can refer to a subscription of certain channel
  */
@@ -170,23 +148,10 @@ export default interface ElmerConnection {
   bindExchange(destination: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty>;
   unbindExchange(destination: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty>;
 
-  //
-  // Convenience methods
-  //
-
-  onQueueMessage<T>(queue: string, callback: MessageCallback<T>, options?: OnQueueOptions): Promise<ChannelPoolSubscription>;
-  onFanoutMessage<T>(fanout: string, callback: MessageCallback<T>, options?: OnExchangeOptions): Promise<ChannelPoolSubscription>;
-  onTopicMessage<T>(
-    topic: string,
-    routingPattern: string,
-    callback: MessageCallback<T>,
-    options?: OnExchangeOptions,
-  ): Promise<ChannelPoolSubscription>;
-
-  publishToQueue<T>(queue: string, message: T, options?: PublishOptions): boolean;
-  publishToDirect<T>(direct: string, routingKey: string, message: T, options?: PublishOptions): boolean;
-  publishToFanout<T>(fanout: string, message: T, options?: PublishOptions): boolean;
-  publishToTopic<T>(topic: string, routingKey: string, message: T, options?: PublishOptions): boolean;
+  consumeQueue<T>(queue: string, callback: MessageCallback<T>, options?: ConsumeOptions): Promise<ChannelPoolSubscription>;
+  consume<T>(exchange: string, pattern: string, callback: MessageCallback<T>, options?: ConsumeOptions): Promise<ChannelPoolSubscription>;
+  sendToQueue<T>(queue: string, message: T, options?: PublishOptions): boolean;
+  publish<T>(exchange: string, routingKey: string, message: T, options?: PublishOptions): boolean;
 
   //
   // Pausing/resuming

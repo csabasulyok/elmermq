@@ -3,7 +3,7 @@ import yall from 'yall2';
 import autoBind from 'auto-bind';
 import ChannelWithRetention from './channelwrapper';
 import id from './util';
-import { ChannelMessageCallback, ChannelPoolSubscription, OnExchangeOptions, OnQueueOptions, PublishOptions } from './api';
+import { ChannelMessageCallback, ChannelPoolSubscription, ConsumeOptions, PublishOptions } from './api';
 
 /**
  * Round-robin channel pool for an AMQP connection
@@ -85,51 +85,25 @@ export default class ChannelPool {
     return ret;
   }
 
-  //
-  // Proxying convenience methods
-  //
-
-  async onQueueMessage<T>(queue: string, callback: ChannelMessageCallback<T>, options?: OnQueueOptions): Promise<ChannelPoolSubscription> {
+  async consumeQueue<T>(queue: string, callback: ChannelMessageCallback<T>, options?: ConsumeOptions): Promise<ChannelPoolSubscription> {
     const channel = this.getChannel();
-    const consumerTag = await channel.onQueueMessage(queue, callback, options);
+    const consumerTag = await channel.consumeQueue(queue, callback, options);
     return { channelName: channel.name, consumerTag };
   }
 
-  async onFanoutMessage<T>(
-    fanout: string,
-    callback: ChannelMessageCallback<T>,
-    options?: OnExchangeOptions,
-  ): Promise<ChannelPoolSubscription> {
-    const channel = this.getChannel();
-    const consumerTag = await channel.onFanoutMessage(fanout, callback, options);
-    return { channelName: channel.name, consumerTag };
-  }
-
-  async onTopicMessage<T>(
-    topic: string,
+  async consume<T>(
+    exchange: string,
     pattern: string,
     callback: ChannelMessageCallback<T>,
-    options?: OnExchangeOptions,
+    options?: ConsumeOptions,
   ): Promise<ChannelPoolSubscription> {
     const channel = this.getChannel();
-    const consumerTag = await channel.onTopicMessage(topic, pattern, callback, options);
+    const consumerTag = await channel.consume(exchange, pattern, callback, options);
     return { channelName: channel.name, consumerTag };
   }
 
-  publishToQueue<T>(queue: string, message: T, options?: PublishOptions): boolean {
-    return this.getChannel().publishToQueue(queue, message, options);
-  }
-
-  publishToDirect<T>(direct: string, routingKey: string, message: T, options?: PublishOptions): boolean {
-    return this.getChannel().publishToDirect(direct, routingKey, message, options);
-  }
-
-  publishToFanout<T>(fanout: string, message: T, options?: PublishOptions): boolean {
-    return this.getChannel().publishToFanout(fanout, message, options);
-  }
-
-  publishToTopic<T>(topic: string, routingKey: string, message: T, options?: PublishOptions): boolean {
-    return this.getChannel().publishToTopic(topic, routingKey, message, options);
+  publish<T>(exchange: string, routingKey: string, message: T, options?: PublishOptions): boolean {
+    return this.getChannel().publish(exchange, routingKey, message, options);
   }
 
   //

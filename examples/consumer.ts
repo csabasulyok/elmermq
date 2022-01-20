@@ -1,10 +1,5 @@
 import connect from '../src';
-
-// message format we expect on a queue
-type MyDto = {
-  name: string;
-  age: number;
-};
+import { MyDto } from './dto';
 
 (async () => {
   // connect with same parameters as amqplib
@@ -14,13 +9,16 @@ type MyDto = {
     poolSize: 4,
   });
 
-  // automatic queue assertion and JSON deserialization
-  conn.onQueueMessage<MyDto>('my_queue', (message: MyDto) => {
+  await conn.assertQueue('my_queue');
+  await conn.assertExchange('my_fanout', 'fanout');
+
+  // automatic JSON deserialization
+  conn.consumeQueue<MyDto>('my_queue', (message: MyDto) => {
     console.log('my_queue ->', message);
   });
 
   // temp queue connected for fanout
-  conn.onFanoutMessage<MyDto>('my_fanout', (message: MyDto) => {
+  conn.consume<MyDto>('my_fanout', undefined, (message: MyDto) => {
     console.log('my_fanout ->', message);
   });
 })();
