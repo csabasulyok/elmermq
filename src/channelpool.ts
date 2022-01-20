@@ -120,6 +120,10 @@ export default class ChannelPool {
     return this.getChannel().publishToQueue(queue, message, options);
   }
 
+  publishToDirect<T>(direct: string, routingKey: string, message: T, options?: PublishOptions): boolean {
+    return this.getChannel().publishToDirect(direct, routingKey, message, options);
+  }
+
   publishToFanout<T>(fanout: string, message: T, options?: PublishOptions): boolean {
     return this.getChannel().publishToFanout(fanout, message, options);
   }

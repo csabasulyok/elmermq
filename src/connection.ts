@@ -248,6 +248,10 @@ export default class ElmerConnectionImpl implements ElmerConnection {
     return this.channelPool.publishToQueue(queue, message, options);
   }
 
+  publishToDirect<T>(direct: string, routingKey: string, message: T, options?: PublishOptions): boolean {
+    return this.channelPool.publishToDirect(direct, routingKey, message, options);
+  }
+
   publishToFanout<T>(fanout: string, message: T, options?: PublishOptions): boolean {
     return this.channelPool.publishToFanout(fanout, message, options);
   }

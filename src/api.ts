@@ -184,6 +184,7 @@ export default interface ElmerConnection {
   ): Promise<ChannelPoolSubscription>;
 
   publishToQueue<T>(queue: string, message: T, options?: PublishOptions): boolean;
+  publishToDirect<T>(direct: string, routingKey: string, message: T, options?: PublishOptions): boolean;
   publishToFanout<T>(fanout: string, message: T, options?: PublishOptions): boolean;
   publishToTopic<T>(topic: string, routingKey: string, message: T, options?: PublishOptions): boolean;
 

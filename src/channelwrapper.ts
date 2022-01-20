@@ -20,7 +20,7 @@ export type ChannelSubscription = {
  * Can be queued and left to be sent out later if channel disconnects.
  */
 export type PublishMessage<T> = {
-  destination: string;
+  destination?: string;
   routingKey: string;
   message: T;
   options?: PublishOptions;
@@ -238,6 +238,9 @@ export default class ChannelWithRetention {
 
     // if connected, send directly
     if (this.connected) {
+      if (!destination) {
+        return this.channel.sendToQueue(routingKey, body, options);
+      }
       return this.channel.publish(destination, routingKey, body, options);
     }
 
@@ -252,8 +255,16 @@ export default class ChannelWithRetention {
 
   publishToQueue<T>(queue: string, message: T, options?: PublishOptions): boolean {
     return this.publish({
-      destination: '',
       routingKey: queue,
+      message,
+      options,
+    });
+  }
+
+  publishToDirect<T>(direct: string, routingKey: string, message: T, options?: PublishOptions): boolean {
+    return this.publish({
+      destination: direct,
+      routingKey,
       message,
       options,
     });
