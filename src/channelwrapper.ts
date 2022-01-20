@@ -1,7 +1,7 @@
 import { Connection, Channel, ConsumeMessage, Options, Replies } from 'amqplib';
 import yall from 'yall2';
 import autoBind from 'auto-bind';
-import { ConsumeOptions, MessageCallback, OnExchangeOptions, OnQueueOptions, PublishOptions } from './api';
+import { ConsumeOptions, ChannelMessageCallback, OnExchangeOptions, OnQueueOptions, PublishOptions } from './api';
 import id from './util';
 import Queue from './queue';
 
@@ -126,7 +126,7 @@ export default class ChannelWithRetention {
   // Common convenience method for processing a message
   //
 
-  private async addConsumer<T>(queue: string, callback: MessageCallback<T>, options?: ConsumeOptions): Promise<Replies.Consume> {
+  private async addConsumer<T>(queue: string, callback: ChannelMessageCallback<T>, options?: ConsumeOptions): Promise<Replies.Consume> {
     const response = await this.channel.consume(
       queue,
       async (message: ConsumeMessage) => {
@@ -147,7 +147,7 @@ export default class ChannelWithRetention {
           }
           yall.debug(body);
 
-          await callback(body);
+          await callback(body, message.properties);
           this.channel.ack(message);
         } catch (e) {
           yall.error(`[${queue}] error, ${e}`);
@@ -164,7 +164,7 @@ export default class ChannelWithRetention {
   // Helpers for different queue/exchange types
   //
 
-  async onQueueMessage<T>(queue: string, callback: MessageCallback<T>, options?: OnQueueOptions): Promise<string> {
+  async onQueueMessage<T>(queue: string, callback: ChannelMessageCallback<T>, options?: OnQueueOptions): Promise<string> {
     // assert queue with given parameters
     await this.channel.assertQueue(queue, options?.assert);
     // build callback
@@ -181,7 +181,7 @@ export default class ChannelWithRetention {
     return consumerTag;
   }
 
-  async onFanoutMessage<T>(fanout: string, callback: MessageCallback<T>, options?: OnExchangeOptions): Promise<string> {
+  async onFanoutMessage<T>(fanout: string, callback: ChannelMessageCallback<T>, options?: OnExchangeOptions): Promise<string> {
     // assert fanout
     await this.channel.assertExchange(fanout, 'fanout', options?.assert);
     // assert temporary queue with given parameters
@@ -202,7 +202,12 @@ export default class ChannelWithRetention {
     return consumerTag;
   }
 
-  async onTopicMessage<T>(topic: string, pattern: string, callback: MessageCallback<T>, options?: OnExchangeOptions): Promise<string> {
+  async onTopicMessage<T>(
+    topic: string,
+    pattern: string,
+    callback: ChannelMessageCallback<T>,
+    options?: OnExchangeOptions,
+  ): Promise<string> {
     // assert fanout
     await this.channel.assertExchange(topic, 'topic', options?.assert);
     // assert temporary queue with given parameters

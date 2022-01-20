@@ -76,7 +76,9 @@ export const extolConnectOptions = new ExtolConnectOptions().extolProps();
 export type ConnectCallback = () => void;
 export type ErrorCallback = (message: string) => void;
 export type CloseCallback = () => void;
-export type MessageCallback<T> = (message: T, properties?: MessageProperties) => Promise<void> | void;
+// eslint-disable-next-line no-use-before-define
+export type MessageCallback<T> = (message: T, connection: ElmerConnection, properties?: MessageProperties) => Promise<void> | void;
+export type ChannelMessageCallback<T> = (message: T, properties?: MessageProperties) => Promise<void> | void;
 
 //
 // Callback options

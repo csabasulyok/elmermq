@@ -1,8 +1,9 @@
-import amqp, { Connection, Options, Replies } from 'amqplib';
+import amqp, { Connection, Options, Replies, MessageProperties } from 'amqplib';
 import yall from 'yall2';
 import autoBind from 'auto-bind';
 
 import ElmerConnection, {
+  ChannelMessageCallback,
   ChannelPoolSubscription,
   CloseCallback,
   ConnectCallback,
@@ -218,12 +219,16 @@ export default class ElmerConnectionImpl implements ElmerConnection {
   //
 
   async onQueueMessage<T>(queue: string, callback: MessageCallback<T>, options?: OnQueueOptions): Promise<ChannelPoolSubscription> {
-    const ret = await this.channelPool.onQueueMessage(queue, callback, options);
+    const decoratedCallback: ChannelMessageCallback<T> = (message: T, properties?: MessageProperties) =>
+      callback(message, this, properties);
+    const ret = await this.channelPool.onQueueMessage(queue, decoratedCallback, options);
     return ret;
   }
 
   async onFanoutMessage<T>(fanout: string, callback: MessageCallback<T>, options?: OnExchangeOptions): Promise<ChannelPoolSubscription> {
-    const ret = await this.channelPool.onFanoutMessage(fanout, callback, options);
+    const decoratedCallback: ChannelMessageCallback<T> = (message: T, properties?: MessageProperties) =>
+      callback(message, this, properties);
+    const ret = await this.channelPool.onFanoutMessage(fanout, decoratedCallback, options);
     return ret;
   }
 
@@ -233,7 +238,9 @@ export default class ElmerConnectionImpl implements ElmerConnection {
     callback: MessageCallback<T>,
     options?: OnExchangeOptions,
   ): Promise<ChannelPoolSubscription> {
-    const ret = await this.channelPool.onTopicMessage(topic, pattern, callback, options);
+    const decoratedCallback: ChannelMessageCallback<T> = (message: T, properties?: MessageProperties) =>
+      callback(message, this, properties);
+    const ret = await this.channelPool.onTopicMessage(topic, pattern, decoratedCallback, options);
     return ret;
   }
 

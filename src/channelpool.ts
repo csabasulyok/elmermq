@@ -3,7 +3,7 @@ import yall from 'yall2';
 import autoBind from 'auto-bind';
 import ChannelWithRetention from './channelwrapper';
 import id from './util';
-import { ChannelPoolSubscription, MessageCallback, OnExchangeOptions, OnQueueOptions, PublishOptions } from './api';
+import { ChannelMessageCallback, ChannelPoolSubscription, OnExchangeOptions, OnQueueOptions, PublishOptions } from './api';
 
 /**
  * Round-robin channel pool for an AMQP connection
@@ -89,13 +89,17 @@ export default class ChannelPool {
   // Proxying convenience methods
   //
 
-  async onQueueMessage<T>(queue: string, callback: MessageCallback<T>, options?: OnQueueOptions): Promise<ChannelPoolSubscription> {
+  async onQueueMessage<T>(queue: string, callback: ChannelMessageCallback<T>, options?: OnQueueOptions): Promise<ChannelPoolSubscription> {
     const channel = this.getChannel();
     const consumerTag = await channel.onQueueMessage(queue, callback, options);
     return { channelName: channel.name, consumerTag };
   }
 
-  async onFanoutMessage<T>(fanout: string, callback: MessageCallback<T>, options?: OnExchangeOptions): Promise<ChannelPoolSubscription> {
+  async onFanoutMessage<T>(
+    fanout: string,
+    callback: ChannelMessageCallback<T>,
+    options?: OnExchangeOptions,
+  ): Promise<ChannelPoolSubscription> {
     const channel = this.getChannel();
     const consumerTag = await channel.onFanoutMessage(fanout, callback, options);
     return { channelName: channel.name, consumerTag };
@@ -104,7 +108,7 @@ export default class ChannelPool {
   async onTopicMessage<T>(
     topic: string,
     pattern: string,
-    callback: MessageCallback<T>,
+    callback: ChannelMessageCallback<T>,
     options?: OnExchangeOptions,
   ): Promise<ChannelPoolSubscription> {
     const channel = this.getChannel();
