@@ -44,11 +44,11 @@ export default class ElmerConnectionImpl implements ElmerConnection {
     onClose?: CloseCallback;
   };
 
-  constructor(connectOptions?: string | ConnectOptions, socketOptions?: Record<string, unknown>) {
+  constructor(urlOrConnectOptions?: string | ConnectOptions, socketOptions?: Record<string, unknown>) {
     let customConnectOptions: ConnectOptions;
 
-    if (typeof connectOptions === 'string' || connectOptions instanceof String) {
-      const url = new URL(connectOptions as string);
+    if (typeof urlOrConnectOptions === 'string' || urlOrConnectOptions instanceof String) {
+      const url = new URL(urlOrConnectOptions as string);
       customConnectOptions = {
         protocol: url.protocol || undefined,
         hostname: url.hostname || undefined,
@@ -58,7 +58,7 @@ export default class ElmerConnectionImpl implements ElmerConnection {
         vhost: url.pathname || undefined,
       };
     } else {
-      customConnectOptions = connectOptions;
+      customConnectOptions = urlOrConnectOptions;
     }
 
     this.connectOptions = {
