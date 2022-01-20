@@ -62,6 +62,11 @@ export default class ChannelWithRetention {
         .map((s) => s?.resubscribe()),
     );
     // if this is a reconnection, send out any messages queued up while disconnected
+    this.flush();
+  }
+
+  flush(): void {
+    // flush any messages queued up while disconnected
     while (this.backedUpQueue.backedUp) {
       const { exchange, routingKey, message, options } = this.backedUpQueue.consume();
       this.publish(exchange, routingKey, message, options);
@@ -70,6 +75,9 @@ export default class ChannelWithRetention {
 
   async close(): Promise<void> {
     try {
+      // attempt to flush queued up messages, if any
+      this.flush();
+      // close channel
       await this.channel.close();
     } catch (err) {
       // channel already closing because the parent connection is, so it can be ignored

@@ -139,10 +139,6 @@ export default class ElmerConnectionImpl implements ElmerConnection {
       });
     });
 
-    // close connection on Ctrl+C
-    process.once('SIGINT', this.close);
-    process.once('SIGTERM', this.close);
-
     this.callbacks.onConnect?.();
   }
 
