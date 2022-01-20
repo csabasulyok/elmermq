@@ -275,6 +275,7 @@ export default class ChannelWithRetention {
       return false;
     }
 
+    yall.info(`Unsubscribing from ${this.subscriptions[consumerTag].source}`);
     await this.channel.cancel(consumerTag);
     delete this.subscriptions[consumerTag];
     return true;

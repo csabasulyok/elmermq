@@ -32,6 +32,7 @@ export default class ChannelPool {
   async close(): Promise<void> {
     // close all channels in pool
     await Promise.all(Object.values(this.channels).map((channel) => channel?.close()));
+    yall.info('AMQP channel pool shut down');
   }
 
   private getChannel(): ChannelWithRetention {
