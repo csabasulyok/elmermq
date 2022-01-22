@@ -156,7 +156,7 @@ export default class ChannelWithRetention {
           }
           yall.debug(body);
 
-          await callback(body, message.properties);
+          await callback(body, message);
           this.channel.ack(message);
         } catch (e) {
           yall.error(`[${queue}] error, ${e}`);

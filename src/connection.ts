@@ -1,4 +1,4 @@
-import amqp, { Connection, Options, Replies, MessageProperties } from 'amqplib';
+import amqp, { Connection, Options, Replies, ConsumeMessage } from 'amqplib';
 import yall from 'yall2';
 import autoBind from 'auto-bind';
 
@@ -210,8 +210,7 @@ export default class ElmerConnectionImpl implements ElmerConnection {
   }
 
   async consumeQueue<T>(queue: string, callback: MessageCallback<T>, options?: ConsumeOptions): Promise<ChannelPoolSubscription> {
-    const decoratedCallback: ChannelMessageCallback<T> = (message: T, properties?: MessageProperties) =>
-      callback(message, this, properties);
+    const decoratedCallback: ChannelMessageCallback<T> = (message: T, rawMessage?: ConsumeMessage) => callback(message, this, rawMessage);
     const ret = await this.channelPool.consumeQueue(queue, decoratedCallback, options);
     return ret;
   }
@@ -222,8 +221,7 @@ export default class ElmerConnectionImpl implements ElmerConnection {
     callback: MessageCallback<T>,
     options?: ConsumeOptions,
   ): Promise<ChannelPoolSubscription> {
-    const decoratedCallback: ChannelMessageCallback<T> = (message: T, properties?: MessageProperties) =>
-      callback(message, this, properties);
+    const decoratedCallback: ChannelMessageCallback<T> = (message: T, rawMessage?: ConsumeMessage) => callback(message, this, rawMessage);
     const ret = await this.channelPool.consume(exchange, pattern, decoratedCallback, options);
     return ret;
   }

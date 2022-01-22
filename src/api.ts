@@ -1,5 +1,10 @@
-import { Options, Replies, MessageProperties } from 'amqplib';
+import { Options, Replies, ConsumeMessage } from 'amqplib';
 import extol, { extolPrefix, WithExtolProps } from 'extol';
+
+/**
+ * re-export some amqplib types we also use in our API
+ */
+export { Options, Replies, ConsumeMessage };
 
 /**
  * Extended version of amqplib connect options.
@@ -77,8 +82,8 @@ export type ConnectCallback = () => void;
 export type ErrorCallback = (message: string) => void;
 export type CloseCallback = () => void;
 // eslint-disable-next-line no-use-before-define
-export type MessageCallback<T> = (message: T, connection: ElmerConnection, properties?: MessageProperties) => Promise<void> | void;
-export type ChannelMessageCallback<T> = (message: T, properties?: MessageProperties) => Promise<void> | void;
+export type MessageCallback<T> = (message: T, connection: ElmerConnection, rawMessage?: ConsumeMessage) => Promise<void> | void;
+export type ChannelMessageCallback<T> = (message: T, rawMessage?: ConsumeMessage) => Promise<void> | void;
 
 //
 // Callback options
