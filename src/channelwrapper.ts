@@ -245,7 +245,13 @@ export default class ChannelWithRetention {
     }
 
     yall.info(`Unsubscribing from ${source} (tag ${consumerTag})`);
-    await this.channel.cancel(consumerTag);
+
+    if (this.connected) {
+      await this.channel.cancel(consumerTag);
+    } else {
+      yall.warn(`Trying to pause subscription ${consumerTag}, but channel closed`);
+    }
+
     this.subscriptions[consumerTag].active = false;
     return true;
   }
@@ -264,6 +270,13 @@ export default class ChannelWithRetention {
     }
 
     yall.info(`Resubscribing to ${source}`);
+
+    if (!this.connected) {
+      yall.warn(`Trying to resume subscription ${consumerTag}, but channel closed`);
+      this.subscriptions[consumerTag].active = true; // set to active, so will resubscribe on next connect
+      return undefined;
+    }
+
     const newConsumerTag = await this.subscriptions[consumerTag].resubscribe();
     delete this.subscriptions[consumerTag];
     return newConsumerTag;
@@ -276,7 +289,13 @@ export default class ChannelWithRetention {
     }
 
     yall.info(`Unsubscribing from ${this.subscriptions[consumerTag].source}`);
-    await this.channel.cancel(consumerTag);
+
+    if (this.connected) {
+      await this.channel.cancel(consumerTag);
+    } else {
+      yall.warn(`Trying to stop subscription ${consumerTag}, but channel closed`);
+    }
+
     delete this.subscriptions[consumerTag];
     return true;
   }
