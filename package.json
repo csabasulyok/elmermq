@@ -28,8 +28,8 @@
   "dependencies": {
     "amqplib": "^0.8.0",
     "auto-bind": "^4.0.0",
-    "extol": "link:../extol",
-    "yall2": "link:../yall2"
+    "extol": "^1.0.1",
+    "yall2": "^1.0.3"
   },
   "devDependencies": {
     "@types/amqplib": "^0.8.2",
