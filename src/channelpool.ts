@@ -3,7 +3,7 @@ import yall from 'yall2';
 import autoBind from 'auto-bind';
 import ChannelWithRetention from './channelwrapper';
 import id from './util';
-import { ChannelMessageCallback, ChannelPoolSubscription, ConsumeOptions, PublishOptions } from './api';
+import { ChannelMessageCallback, ChannelPoolSubscription, ConsumeOptions, ExclusiveConsumeOptions, PublishOptions } from './api';
 
 /**
  * Round-robin channel pool for an AMQP connection
@@ -96,7 +96,7 @@ export default class ChannelPool {
     exchange: string,
     pattern: string,
     callback: ChannelMessageCallback<T>,
-    options?: ConsumeOptions,
+    options?: ExclusiveConsumeOptions,
   ): Promise<ChannelPoolSubscription> {
     const channel = this.getChannel();
     const consumerTag = await channel.consume(exchange, pattern, callback, options);

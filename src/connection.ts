@@ -10,6 +10,7 @@ import ElmerConnection, {
   ConnectOptions,
   ConsumeOptions,
   ErrorCallback,
+  ExclusiveConsumeOptions,
   extolConnectOptions,
   MessageCallback,
   PublishOptions,
@@ -219,7 +220,7 @@ export default class ElmerConnectionImpl implements ElmerConnection {
     exchange: string,
     pattern: string,
     callback: MessageCallback<T>,
-    options?: ConsumeOptions,
+    options?: ExclusiveConsumeOptions,
   ): Promise<ChannelPoolSubscription> {
     const decoratedCallback: ChannelMessageCallback<T> = (message: T, rawMessage?: ConsumeMessage) => callback(message, this, rawMessage);
     const ret = await this.channelPool.consume(exchange, pattern, decoratedCallback, options);

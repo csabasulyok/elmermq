@@ -98,6 +98,15 @@ export type ConsumeOptions = Options.Consume & {
   raw?: boolean;
 };
 
+export type ExclusiveConsumeOptions = ConsumeOptions & {
+  /**
+   * For exclusive/auto-delete temporary consumes, a queue name is generated automatically.
+   * This string is set as its prefix.
+   * Default: the exchange name we route to the temporary queue
+   */
+  queuePrefix?: string;
+};
+
 export type PublishOptions = Options.Publish & {
   /**
    * If set, the input must be a Buffer to be sent directly.
@@ -154,7 +163,12 @@ export default interface ElmerConnection {
   unbindExchange(destination: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty>;
 
   consumeQueue<T>(queue: string, callback: MessageCallback<T>, options?: ConsumeOptions): Promise<ChannelPoolSubscription>;
-  consume<T>(exchange: string, pattern: string, callback: MessageCallback<T>, options?: ConsumeOptions): Promise<ChannelPoolSubscription>;
+  consume<T>(
+    exchange: string,
+    pattern: string,
+    callback: MessageCallback<T>,
+    options?: ExclusiveConsumeOptions,
+  ): Promise<ChannelPoolSubscription>;
   sendToQueue<T>(queue: string, message: T, options?: PublishOptions): boolean;
   publish<T>(exchange: string, routingKey: string, message: T, options?: PublishOptions): boolean;
 

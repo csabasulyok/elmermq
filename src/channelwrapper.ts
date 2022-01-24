@@ -1,7 +1,7 @@
 import { Connection, Channel, ConsumeMessage, Options, Replies } from 'amqplib';
 import yall from 'yall2';
 import autoBind from 'auto-bind';
-import { ConsumeOptions, ChannelMessageCallback, PublishOptions } from './api';
+import { ConsumeOptions, ChannelMessageCallback, PublishOptions, ExclusiveConsumeOptions } from './api';
 import id from './util';
 import Queue from './queue';
 
@@ -188,9 +188,14 @@ export default class ChannelWithRetention {
     return consumerTag;
   }
 
-  async consume<T>(exchange: string, pattern: string, callback: ChannelMessageCallback<T>, options?: ConsumeOptions): Promise<string> {
+  async consume<T>(
+    exchange: string,
+    pattern: string,
+    callback: ChannelMessageCallback<T>,
+    options?: ExclusiveConsumeOptions,
+  ): Promise<string> {
     // assert temporary queue with given parameters
-    const queue = `${exchange}-${id()}`;
+    const queue = `${options?.queuePrefix || exchange}-${id()}`;
     await this.channel.assertQueue(queue, { exclusive: true, autoDelete: true });
     await this.channel.bindQueue(queue, exchange, pattern);
     // build callback
