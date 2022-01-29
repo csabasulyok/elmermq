@@ -15,7 +15,6 @@ import ElmerConnection, {
   MessageCallback,
   PublishOptions,
 } from './api';
-import { MessageBrokerSubscription } from './subscription';
 import ChannelPool from './channelpool';
 
 export default class ElmerConnectionImpl implements ElmerConnection {
@@ -29,13 +28,8 @@ export default class ElmerConnectionImpl implements ElmerConnection {
   // reconnection settings
   private timeout?: NodeJS.Timeout;
   private reconnectAttempts = 0;
-
-  // dynamic subscriptions, temp queues
-  private subscriptions: {
-    [objectName: string]: {
-      [consumerKey: string]: MessageBrokerSubscription;
-    };
-  };
+  // replayable actions
+  private connected: boolean;
 
   // callbacks for proprietary/wrapped events
   callbacks: {
@@ -77,6 +71,7 @@ export default class ElmerConnectionImpl implements ElmerConnection {
     this.callbacks = {};
     this.channelPool = new ChannelPool(this.connectOptions.poolSize);
     this.closeRequested = false;
+    this.connected = false;
 
     autoBind(this);
   }
@@ -89,6 +84,7 @@ export default class ElmerConnectionImpl implements ElmerConnection {
       this.reconnectAttempts += 1;
       yall.info(`Connecting to AMQP broker on ${protocol}://${hostname}:${port} (attempt ${this.reconnectAttempts})...`);
       this.connection = await amqp.connect(this.connectOptions, this.socketOptions);
+      this.connected = true;
     } catch (e) {
       if (!this.timeout) {
         yall.error(`Connection failed, attempting again in ${reconnectInterval}ms...`);
@@ -111,6 +107,7 @@ export default class ElmerConnectionImpl implements ElmerConnection {
     });
 
     this.connection.on('close', () => {
+      this.connected = false;
       if (this.closeRequested) {
         yall.info('AMQP broker connection closed successfully');
         return;
@@ -129,24 +126,15 @@ export default class ElmerConnectionImpl implements ElmerConnection {
 
     await this.channelPool.connect(this.connection);
 
-    this.subscriptions = {};
-
-    // if this is a reconnection, reconnect all previously active subscriptions
-    Object.values(this.subscriptions).forEach((subscriptions) => {
-      Object.values(subscriptions).forEach((subscription) => {
-        if (subscription?.active) {
-          subscription?.resubscribe();
-        }
-      });
-    });
-
     this.callbacks.onConnect?.();
   }
 
   async close(): Promise<void> {
     this.closeRequested = true;
     await this.channelPool?.close();
-    await this.connection?.close();
+    if (this.connected) {
+      await this.connection?.close();
+    }
     this.callbacks.onClose?.();
   }
 
