@@ -1,10 +1,11 @@
+/* eslint-disable no-restricted-syntax */
+/* eslint-disable no-await-in-loop */
 import amqp, { Connection, Options, Replies, ConsumeMessage } from 'amqplib';
 import yall from 'yall2';
 import autoBind from 'auto-bind';
 
 import ElmerConnection, {
   ChannelMessageCallback,
-  ChannelPoolSubscription,
   CloseCallback,
   ConnectCallback,
   ConnectOptions,
@@ -15,7 +16,8 @@ import ElmerConnection, {
   MessageCallback,
   PublishOptions,
 } from './api';
-import ChannelPool from './channelpool';
+import ChannelPool, { ChannelPoolSubscription } from './channelpool';
+import RabbitModel from './model';
 
 export default class ElmerConnectionImpl implements ElmerConnection {
   // connection options
@@ -24,6 +26,7 @@ export default class ElmerConnectionImpl implements ElmerConnection {
   // amqp objects
   private connection: Connection;
   private channelPool: ChannelPool;
+  private model: RabbitModel;
   private closeRequested: boolean;
   // reconnection settings
   private timeout?: NodeJS.Timeout;
@@ -70,6 +73,7 @@ export default class ElmerConnectionImpl implements ElmerConnection {
 
     this.callbacks = {};
     this.channelPool = new ChannelPool(this.connectOptions.poolSize);
+    this.model = new RabbitModel();
     this.closeRequested = false;
     this.connected = false;
 
@@ -126,6 +130,9 @@ export default class ElmerConnectionImpl implements ElmerConnection {
 
     await this.channelPool.connect(this.connection);
 
+    // replay model
+    await this.replayModel();
+
     this.callbacks.onConnect?.();
   }
 
@@ -136,6 +143,44 @@ export default class ElmerConnectionImpl implements ElmerConnection {
       await this.connection?.close();
     }
     this.callbacks.onClose?.();
+  }
+
+  private async replayModel(): Promise<void> {
+    // assert exchanges
+    for (const exchange of this.model.exchanges.values()) {
+      if (exchange.asserted) {
+        await this.channelPool.assertExchange(exchange.name, exchange.type, exchange.options);
+      }
+    }
+    // assert queues
+    for (const queue of this.model.queues.values()) {
+      if (queue.asserted) {
+        await this.channelPool.assertQueue(queue.name, queue.options);
+      }
+    }
+    // exchange-to-exchange bindings
+    for (const exchange of this.model.exchanges.values()) {
+      for (const { source, pattern, args } of exchange.bindings.values()) {
+        await this.channelPool.bindExchange(exchange.name, source, pattern, args);
+      }
+    }
+    // queue-to-exchange bindings
+    for (const queue of this.model.queues.values()) {
+      for (const { source, pattern, args } of queue.bindings.values()) {
+        await this.channelPool.bindQueue(queue.name, source, pattern, args);
+      }
+    }
+
+    // resume subscriptions
+    await this.resumeAllSubscriptions();
+
+    // flush messages that couldn't be sent
+    for (const exchange of this.model.exchanges.values()) {
+      while (exchange.backedUpQueue.backedUp) {
+        const { routingKey, message, options } = exchange.backedUpQueue.consume();
+        this.publish(exchange.name, routingKey, message, options);
+      }
+    }
   }
 
   //
@@ -159,90 +204,141 @@ export default class ElmerConnectionImpl implements ElmerConnection {
   //
 
   async assertQueue(queue: string, options?: Options.AssertQueue): Promise<Replies.AssertQueue> {
+    this.model.assertQueue(queue, options);
     const ret = await this.channelPool.assertQueue(queue, options);
     return ret;
   }
 
   async deleteQueue(queue: string, options?: Options.DeleteQueue): Promise<Replies.DeleteQueue> {
+    this.model.deleteQueue(queue);
     const ret = await this.channelPool.deleteQueue(queue, options);
     return ret;
   }
 
   async bindQueue(queue: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty> {
+    this.model.bindQueue(queue, source, pattern, args);
     const ret = await this.channelPool.bindQueue(queue, source, pattern, args);
     return ret;
   }
 
   async unbindQueue(queue: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty> {
+    this.model.unbindQueue(queue, source, pattern);
     const ret = await this.channelPool.unbindQueue(queue, source, pattern, args);
     return ret;
   }
 
   async assertExchange(exchange: string, type: string, options?: Options.AssertExchange): Promise<Replies.AssertExchange> {
+    this.model.assertExchange(exchange, type, options);
     const ret = await this.channelPool.assertExchange(exchange, type, options);
     return ret;
   }
 
   async deleteExchange(exchange: string, options?: Options.DeleteExchange): Promise<Replies.Empty> {
+    this.model.deleteExchange(exchange);
     const ret = await this.channelPool.deleteExchange(exchange, options);
     return ret;
   }
 
   async bindExchange(destination: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty> {
+    this.model.bindExchange(destination, source, pattern, args);
     const ret = await this.channelPool.bindExchange(destination, source, pattern, args);
     return ret;
   }
 
   async unbindExchange(destination: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty> {
+    this.model.unbindExchange(destination, source, pattern);
     const ret = await this.channelPool.unbindExchange(destination, source, pattern, args);
     return ret;
   }
 
-  async consumeQueue<T>(queue: string, callback: MessageCallback<T>, options?: ConsumeOptions): Promise<ChannelPoolSubscription> {
+  //
+  // consuming messages
+  //
+
+  async consumeQueue<T>(queue: string, callback: MessageCallback<T>, options?: ConsumeOptions): Promise<string> {
     const decoratedCallback: ChannelMessageCallback<T> = (message: T, rawMessage?: ConsumeMessage) => callback(message, this, rawMessage);
-    const ret = await this.channelPool.consumeQueue(queue, decoratedCallback, options);
-    return ret;
+    const channelPoolSubscription = await this.channelPool.consumeQueue(queue, decoratedCallback, options);
+    const subscriptionId = this.model.consumeQueue(channelPoolSubscription, queue, decoratedCallback, options);
+    return subscriptionId;
   }
 
-  async consume<T>(
-    exchange: string,
-    pattern: string,
-    callback: MessageCallback<T>,
-    options?: ExclusiveConsumeOptions,
-  ): Promise<ChannelPoolSubscription> {
+  async consume<T>(exchange: string, pattern: string, callback: MessageCallback<T>, options?: ExclusiveConsumeOptions): Promise<string> {
     const decoratedCallback: ChannelMessageCallback<T> = (message: T, rawMessage?: ConsumeMessage) => callback(message, this, rawMessage);
-    const ret = await this.channelPool.consume(exchange, pattern, decoratedCallback, options);
-    return ret;
+    const channelPoolSubscription = await this.channelPool.consume(exchange, pattern, decoratedCallback, options);
+    const subscriptionId = this.model.consume(channelPoolSubscription, exchange, pattern, decoratedCallback, options);
+    return subscriptionId;
   }
+
+  //
+  // publishing messages
+  //
 
   sendToQueue<T>(queue: string, message: T, options?: PublishOptions): boolean {
-    return this.channelPool.publish('', queue, message, options);
+    return this.publish('', queue, message, options);
   }
 
   publish<T>(exchange: string, routingKey: string, message: T, options?: PublishOptions): boolean {
-    return this.channelPool.publish(exchange, routingKey, message, options);
+    // if connected, send directly
+    if (this.connected) {
+      return this.channelPool.publish(exchange, routingKey, message, options);
+    }
+    // disconnected - will try to reconnect, in the meantime queue up message
+    this.model.publish(exchange, routingKey, message, options);
+    return true;
   }
 
   //
   // Pausing/resuming
   //
 
-  isListenerActive(subscription: ChannelPoolSubscription): boolean {
-    return this.channelPool.isListenerActive(subscription);
+  isSubscriptionActive(subscriptionId: string): boolean {
+    return this.model.isSubscriptionActive(subscriptionId);
   }
 
-  async pauseListener(subscription: ChannelPoolSubscription): Promise<boolean> {
-    const ret = await this.channelPool.pauseListener(subscription);
-    return ret;
+  async pauseAllSubscriptions(): Promise<void> {
+    for (const subscriptionId of this.model.subscriptions.keys()) {
+      await this.pauseSubscription(subscriptionId);
+    }
   }
 
-  async resumeListener(subscription: ChannelPoolSubscription): Promise<ChannelPoolSubscription> {
-    const ret = await this.channelPool.resumeListener(subscription);
-    return ret;
+  async pauseSubscription(subscriptionId: string): Promise<void> {
+    const channelPoolSubscription = this.model.pauseSubscription(subscriptionId);
+    if (channelPoolSubscription && this.connected) {
+      await this.channelPool.cancel(channelPoolSubscription);
+    }
   }
 
-  async stopListener(subscription: ChannelPoolSubscription): Promise<boolean> {
-    const ret = await this.channelPool.stopListener(subscription);
-    return ret;
+  async resumeAllSubscriptions(): Promise<void> {
+    for (const subscriptionId of this.model.subscriptions.keys()) {
+      await this.resumeSubscription(subscriptionId);
+    }
+  }
+
+  async resumeSubscription(subscriptionId: string): Promise<void> {
+    const subscription = this.model.subscriptions.get(subscriptionId);
+    if (subscription && this.connected) {
+      let channelPoolSubscription: ChannelPoolSubscription;
+      if (subscription.type === 'queue') {
+        const { source, callback, options } = subscription;
+        channelPoolSubscription = await this.channelPool.consumeQueue(source, callback, options);
+      } else {
+        const { source, pattern, callback, options } = subscription;
+        channelPoolSubscription = await this.channelPool.consume(source, pattern, callback, options);
+      }
+      this.model.resumeSubscription(subscriptionId, channelPoolSubscription);
+    }
+  }
+
+  async cancelAllSubscriptions(): Promise<void> {
+    for (const subscriptionId of this.model.subscriptions.keys()) {
+      await this.cancelSubscription(subscriptionId);
+    }
+  }
+
+  async cancelSubscription(subscriptionId: string): Promise<void> {
+    const channelPoolSubscription = this.model.cancelSubscription(subscriptionId);
+    if (channelPoolSubscription && this.connected) {
+      await this.channelPool.cancel(channelPoolSubscription);
+    }
   }
 }

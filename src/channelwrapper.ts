@@ -3,80 +3,28 @@ import yall from 'yall2';
 import autoBind from 'auto-bind';
 import { ConsumeOptions, ChannelMessageCallback, PublishOptions, ExclusiveConsumeOptions } from './api';
 import id from './util';
-import Queue from './queue';
 
 /**
- * Description of a subscription sufficient to re-subscribe or pause/resume
+ * Wrapper around AMQP channel
+ * with convenience methods
  */
-export type ChannelSubscription = {
-  consumerTag: string;
-  source: string;
-  resubscribe: () => Promise<string>;
-  active: boolean;
-};
-
-/**
- * Message to be published, with all destination information.
- * Can be queued and left to be sent out later if channel disconnects.
- */
-export type PublishMessage<T> = {
-  exchange?: string;
-  routingKey: string;
-  message: T;
-  options?: PublishOptions;
-};
-
-/**
- * Wrapper around AMQP channel which remembers its own susbcriptions
- * and is re-bindable to a new connection, when reconnection is necessary
- */
-export default class ChannelWithRetention {
+export default class ChannelWrapper {
   private channel: Channel;
-  private subscriptions: Record<string, ChannelSubscription>;
-  private backedUpQueue: Queue<PublishMessage<unknown>>;
 
   name: string;
-  connected: boolean;
 
   constructor(name: string) {
     this.name = name;
-    this.connected = false;
-    this.subscriptions = {};
-    this.backedUpQueue = new Queue();
     autoBind(this);
   }
 
   async connect(connection: Connection): Promise<void> {
     this.channel = await connection.createChannel();
     this.channel.prefetch(1);
-
-    this.channel.on('close', () => {
-      this.connected = false;
-    });
-
-    this.connected = true;
-    // if this is a reconnection, reconnect all previously active subscriptions
-    await Promise.all(
-      Object.values(this.subscriptions)
-        .filter((s) => s?.active)
-        .map((s) => s?.resubscribe()),
-    );
-    // if this is a reconnection, send out any messages queued up while disconnected
-    this.flush();
-  }
-
-  flush(): void {
-    // flush any messages queued up while disconnected
-    while (this.backedUpQueue.backedUp) {
-      const { exchange, routingKey, message, options } = this.backedUpQueue.consume();
-      this.publish(exchange, routingKey, message, options);
-    }
   }
 
   async close(): Promise<void> {
     try {
-      // attempt to flush queued up messages, if any
-      this.flush();
       // close channel
       await this.channel.close();
     } catch (err) {
@@ -176,14 +124,6 @@ export default class ChannelWithRetention {
   async consumeQueue<T>(queue: string, callback: ChannelMessageCallback<T>, options?: ConsumeOptions): Promise<string> {
     // build callback
     const { consumerTag } = await this.addConsumer(queue, callback, options);
-    // register subscription so resubscription is possible with other connection/channel
-    this.subscriptions[consumerTag] = {
-      consumerTag,
-      source: queue,
-      active: true,
-      resubscribe: () => this.consumeQueue(queue, callback, options),
-    };
-
     yall.info(`Subscribed to messages from queue ${queue}`);
     return consumerTag;
   }
@@ -200,108 +140,25 @@ export default class ChannelWithRetention {
     await this.channel.bindQueue(queue, exchange, pattern);
     // build callback
     const { consumerTag } = await this.addConsumer(queue, callback, options);
-    // register subscription so resubscription is possible with other connection/channel
-    this.subscriptions[consumerTag] = {
-      consumerTag,
-      source: exchange,
-      active: true,
-      resubscribe: () => this.consume(exchange, pattern, callback, options),
-    };
 
-    yall.info(`Subscribed to exchange ${exchange}:${pattern} via temp queue ${queue}`);
+    yall.info(`Subscribed to exchange ${exchange}${pattern ? `:${pattern}` : ''} via temp queue ${queue}`);
     return consumerTag;
   }
 
   publish<T>(exchange: string, routingKey: string, message: T, options?: PublishOptions): boolean {
     const body = options?.raw ? (message as unknown as Buffer) : Buffer.from(JSON.stringify(message));
 
-    // if connected, send directly
-    if (this.connected) {
-      if (!exchange) {
-        return this.channel.sendToQueue(routingKey, body, options);
-      }
-      return this.channel.publish(exchange, routingKey, body, options);
+    if (!exchange) {
+      return this.channel.sendToQueue(routingKey, body, options);
     }
-
-    // disconnected - will try to reconnect, in the meantime queue up message
-    this.backedUpQueue.push({ exchange, routingKey, message, options });
-    return true;
+    return this.channel.publish(exchange, routingKey, body, options);
   }
 
   //
   // Pausing/resuming
   //
 
-  isListenerActive(consumerTag: string): boolean {
-    return this.subscriptions[consumerTag]?.active;
-  }
-
-  async pauseListener(consumerTag: string): Promise<boolean> {
-    if (!(consumerTag in this.subscriptions)) {
-      yall.warn(`Trying to pause non-existent subscription ${consumerTag}`);
-      return false;
-    }
-
-    const { source, active } = this.subscriptions[consumerTag];
-
-    if (!active) {
-      yall.warn(`Trying to pause already paused subscription ${source}`);
-      return false;
-    }
-
-    yall.info(`Unsubscribing from ${source} (tag ${consumerTag})`);
-
-    if (this.connected) {
-      await this.channel.cancel(consumerTag);
-    } else {
-      yall.warn(`Trying to pause subscription ${consumerTag}, but channel closed`);
-    }
-
-    this.subscriptions[consumerTag].active = false;
-    return true;
-  }
-
-  async resumeListener(consumerTag: string): Promise<string> {
-    if (!(consumerTag in this.subscriptions)) {
-      yall.warn(`Trying to resume non-existent subscription ${consumerTag}`);
-      return undefined;
-    }
-
-    const { source, active } = this.subscriptions[consumerTag];
-
-    if (active) {
-      yall.warn(`Trying to resume already active subscription to ${source}`);
-      return undefined;
-    }
-
-    yall.info(`Resubscribing to ${source}`);
-
-    if (!this.connected) {
-      yall.warn(`Trying to resume subscription ${consumerTag}, but channel closed`);
-      this.subscriptions[consumerTag].active = true; // set to active, so will resubscribe on next connect
-      return undefined;
-    }
-
-    const newConsumerTag = await this.subscriptions[consumerTag].resubscribe();
-    delete this.subscriptions[consumerTag];
-    return newConsumerTag;
-  }
-
-  async stopListener(consumerTag: string): Promise<boolean> {
-    if (!(consumerTag in this.subscriptions)) {
-      yall.warn(`Trying to stop listening on non-existent subscription ${consumerTag}`);
-      return false;
-    }
-
-    yall.info(`Unsubscribing from ${this.subscriptions[consumerTag].source}`);
-
-    if (this.connected) {
-      await this.channel.cancel(consumerTag);
-    } else {
-      yall.warn(`Trying to stop subscription ${consumerTag}, but channel closed`);
-    }
-
-    delete this.subscriptions[consumerTag];
-    return true;
+  async cancel(consumerTag: string): Promise<void> {
+    await this.channel.cancel(consumerTag);
   }
 }
