@@ -67,7 +67,14 @@ export default class ElmerConnectionImpl implements ElmerConnection {
       },
     };
 
-    this.callbacks = {};
+    // default onerror callback - exit process!
+    this.callbacks = {
+      onError: (message: string) => {
+        yall.error(`RabbitMQ connection error: ${message}. Exiting process. Associate callback to override this`);
+        process.exit(1);
+      },
+    };
+
     this.channelPool = new ChannelPool(this.connectOptions.poolSize);
     this.model = new RabbitModel();
     this.closeRequested = false;
