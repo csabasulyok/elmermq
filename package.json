@@ -20,10 +20,7 @@
     "clean": "rimraf dist *.tsbuildinfo",
     "build": "tsc -p tsconfig.build.json",
     "cb": "pnpm clean && pnpm build",
-    "lint": "eslint 'src/**/*.{js,ts,jsx,tsx}' --quiet --fix",
-    "example:consumer": "nodemon examples/consumer.ts",
-    "example:broadcaster": "nodemon examples/broadcaster.ts",
-    "example:consumerpause": "nodemon examples/consumerpause.ts"
+    "lint": "eslint 'src/**/*.{js,ts,jsx,tsx}' --quiet --fix"
   },
   "dependencies": {
     "amqplib": "^0.8.0",

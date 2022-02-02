@@ -14,11 +14,11 @@ import { MyDto } from './dto';
 
   // automatic JSON deserialization
   conn.consumeQueue<MyDto>('my_queue', (message: MyDto) => {
-    console.log('my_queue ->', message);
+    console.log('my_queue ->', message.idx, message.date);
   });
 
   // temp queue connected for fanout
   conn.consume<MyDto>('my_fanout', undefined, (message: MyDto) => {
-    console.log('my_fanout ->', message);
+    console.log('my_fanout ->', message.idx, message.date);
   });
 })();

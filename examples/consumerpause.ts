@@ -12,15 +12,15 @@ const sleep = promisify((timeout: number, callback: () => void) => setTimeout(ca
 
   await conn.assertQueue('my_queue');
 
-  let sub = await conn.consumeQueue<MyDto>('my_queue', (message: MyDto) => {
-    console.log('my_queue ->', message);
+  const sub = await conn.consumeQueue<MyDto>('my_queue', (message: MyDto) => {
+    console.log('my_queue ->', message.idx, message.date);
   });
 
   // toggle pause/resume on listening every 5 seconds
   setInterval(async () => {
     await sleep(5000);
-    await conn.pauseListener(sub);
+    await conn.pauseSubscription(sub);
     await sleep(5000);
-    sub = await conn.resumeListener(sub);
+    await conn.resumeSubscription(sub);
   }, 10000);
 })();

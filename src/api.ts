@@ -78,9 +78,7 @@ export const extolConnectOptions = new ExtolConnectOptions().extolProps();
 //
 // Callback types
 //
-export type ConnectCallback = () => void;
 export type ErrorCallback = (message: string) => void;
-export type CloseCallback = () => void;
 // eslint-disable-next-line no-use-before-define
 export type MessageCallback<T> = (message: T, connection: ElmerConnection, rawMessage?: ConsumeMessage) => Promise<void> | void;
 export type ChannelMessageCallback<T> = (message: T, rawMessage?: ConsumeMessage) => Promise<void> | void;
@@ -117,16 +115,6 @@ export type PublishOptions = Options.Publish & {
 };
 
 /**
- * Return key so that client can refer to a subscription of certain channel
- */
-export type ChannelPoolSubscription = {
-  channelName: string;
-  consumerTag: string;
-};
-
-//
-// Message
-/**
  * A connection to the AMQP server.
  * Uses auto-reconnect and channel pooling.
  */
@@ -142,9 +130,7 @@ export default interface ElmerConnection {
   // Callbacks for life cycle events
   //
 
-  onConnect(callback: ConnectCallback): void;
   onError(callback: ErrorCallback): void;
-  onClose(callback: CloseCallback): void;
 
   //
   // Decorated methods of channel from channel pool
@@ -162,13 +148,8 @@ export default interface ElmerConnection {
   bindExchange(destination: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty>;
   unbindExchange(destination: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty>;
 
-  consumeQueue<T>(queue: string, callback: MessageCallback<T>, options?: ConsumeOptions): Promise<ChannelPoolSubscription>;
-  consume<T>(
-    exchange: string,
-    pattern: string,
-    callback: MessageCallback<T>,
-    options?: ExclusiveConsumeOptions,
-  ): Promise<ChannelPoolSubscription>;
+  consumeQueue<T>(queue: string, callback: MessageCallback<T>, options?: ConsumeOptions): Promise<string>;
+  consume<T>(exchange: string, pattern: string, callback: MessageCallback<T>, options?: ExclusiveConsumeOptions): Promise<string>;
   sendToQueue<T>(queue: string, message: T, options?: PublishOptions): boolean;
   publish<T>(exchange: string, routingKey: string, message: T, options?: PublishOptions): boolean;
 
@@ -176,8 +157,8 @@ export default interface ElmerConnection {
   // Pausing/resuming
   //
 
-  isListenerActive(subscription: ChannelPoolSubscription): boolean;
-  pauseListener(subscription: ChannelPoolSubscription): Promise<boolean>;
-  resumeListener(subscription: ChannelPoolSubscription): Promise<ChannelPoolSubscription>;
-  stopListener(subscription: ChannelPoolSubscription): Promise<boolean>;
+  isSubscriptionActive(subscriptionId: string): boolean;
+  pauseSubscription(subscriptionId: string): Promise<void>;
+  resumeSubscription(subscriptionId: string): Promise<void>;
+  cancelSubscription(subscriptionId: string): Promise<void>;
 }

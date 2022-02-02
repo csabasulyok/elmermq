@@ -2,7 +2,7 @@
  * In-memory FIFO queue to store some messages
  * which are waiting for an active connection
  */
-export default class Queue<T> {
+export default class FifoQueue<T> {
   private messages: Record<number, T>;
   private readIdx: number;
   private writeIdx: number;

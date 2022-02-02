@@ -26,10 +26,10 @@ import { MyDto } from './dto';
 
     // automatic JSON serialization when publishing
     conn.sendToQueue('my_queue', message);
-    console.log('my_queue <-', message);
+    console.log('my_queue <-', message.idx, message.date);
   }, 2000);
 
-  let fanoutIdx = 0;
+  let fanoutIdx = 1000;
   setInterval(() => {
     const message: MyDto = {
       idx: fanoutIdx,
@@ -40,6 +40,6 @@ import { MyDto } from './dto';
     fanoutIdx += 1;
 
     conn.publish('my_fanout', undefined, message);
-    console.log('my_fanout <-', message);
+    console.log('my_fanout <-', message.idx, message.date);
   }, 7500);
 })();

@@ -1,9 +1,17 @@
 import { Connection, Options, Replies } from 'amqplib';
 import yall from 'yall2';
 import autoBind from 'auto-bind';
-import ChannelWithRetention from './channelwrapper';
+import ChannelWrapper from './channelwrapper';
 import id from './util';
-import { ChannelMessageCallback, ChannelPoolSubscription, ConsumeOptions, ExclusiveConsumeOptions, PublishOptions } from './api';
+import { ChannelMessageCallback, ConsumeOptions, ExclusiveConsumeOptions, PublishOptions } from './api';
+
+/**
+ * Return key so that client can refer to a subscription of certain channel
+ */
+export type ChannelPoolSubscription = {
+  channelName: string;
+  consumerTag: string;
+};
 
 /**
  * Round-robin channel pool for an AMQP connection
@@ -12,19 +20,22 @@ export default class ChannelPool {
   private connection: Connection;
   private poolSize: number;
   private channelNames: string[];
-  private channels: Record<string, ChannelWithRetention>; // round-robin channel pool
+  private channels: Record<string, ChannelWrapper>; // round-robin channel pool
+  private outgoingChannels: Record<string, ChannelWrapper>; // always associate certain exchanges with the same channel
   private channelCounter: number;
 
   constructor(poolSize: number) {
     this.poolSize = poolSize;
     this.channelNames = Array.from({ length: this.poolSize }, id);
-    this.channels = Object.fromEntries(this.channelNames.map((name) => [name, new ChannelWithRetention(name)]));
+    this.channels = Object.fromEntries(this.channelNames.map((name) => [name, new ChannelWrapper(name)]));
+    this.outgoingChannels = {};
     autoBind(this);
   }
 
   async connect(connection: Connection): Promise<void> {
     this.connection = connection;
     this.channelCounter = 0;
+    this.outgoingChannels = {};
     await Promise.all(this.channelNames.map((name) => this.channels[name].connect(this.connection)));
     yall.info(`AMQP channel pool initialized with ${this.poolSize} channels`);
   }
@@ -35,11 +46,18 @@ export default class ChannelPool {
     yall.info('AMQP channel pool shut down');
   }
 
-  private getChannel(): ChannelWithRetention {
+  private getChannel(): ChannelWrapper {
     // hand out channel by round robin
     const name = this.channelNames[this.channelCounter];
     this.channelCounter = (this.channelCounter + 1) % this.poolSize;
     return this.channels[name];
+  }
+
+  private getOutgoingChannel(exchange: string): ChannelWrapper {
+    if (!(exchange in this.outgoingChannels)) {
+      this.outgoingChannels[exchange] = this.getChannel();
+    }
+    return this.outgoingChannels[exchange];
   }
 
   //
@@ -86,6 +104,10 @@ export default class ChannelPool {
     return ret;
   }
 
+  //
+  // consuming messages
+  //
+
   async consumeQueue<T>(queue: string, callback: ChannelMessageCallback<T>, options?: ConsumeOptions): Promise<ChannelPoolSubscription> {
     const channel = this.getChannel();
     const consumerTag = await channel.consumeQueue(queue, callback, options);
@@ -103,37 +125,16 @@ export default class ChannelPool {
     return { channelName: channel.name, consumerTag };
   }
 
+  async cancel(subscription: ChannelPoolSubscription): Promise<void> {
+    const channel = this.channels[subscription.channelName];
+    return channel?.cancel(subscription.consumerTag);
+  }
+
+  //
+  // publishing messages
+  //
+
   publish<T>(exchange: string, routingKey: string, message: T, options?: PublishOptions): boolean {
-    return this.getChannel().publish(exchange, routingKey, message, options);
-  }
-
-  //
-  // Pausing/resuming
-  //
-
-  isListenerActive(subscription: ChannelPoolSubscription): boolean {
-    const channel = this.channels[subscription.channelName];
-    return channel?.isListenerActive(subscription.consumerTag);
-  }
-
-  async pauseListener(subscription: ChannelPoolSubscription): Promise<boolean> {
-    const channel = this.channels[subscription.channelName];
-    const ret = await channel?.pauseListener(subscription.consumerTag);
-    return ret;
-  }
-
-  async resumeListener(subscription: ChannelPoolSubscription): Promise<ChannelPoolSubscription> {
-    const channel = this.channels[subscription.channelName];
-    const newConsumerTag = await channel?.resumeListener(subscription.consumerTag);
-    return {
-      channelName: subscription.channelName,
-      consumerTag: newConsumerTag,
-    };
-  }
-
-  async stopListener(subscription: ChannelPoolSubscription): Promise<boolean> {
-    const channel = this.channels[subscription.channelName];
-    const ret = await channel?.stopListener(subscription.consumerTag);
-    return ret;
+    return this.getOutgoingChannel(exchange).publish(exchange, routingKey, message, options);
   }
 }
