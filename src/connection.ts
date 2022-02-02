@@ -6,8 +6,6 @@ import autoBind from 'auto-bind';
 
 import ElmerConnection, {
   ChannelMessageCallback,
-  CloseCallback,
-  ConnectCallback,
   ConnectOptions,
   ConsumeOptions,
   ErrorCallback,
@@ -36,9 +34,7 @@ export default class ElmerConnectionImpl implements ElmerConnection {
 
   // callbacks for proprietary/wrapped events
   callbacks: {
-    onConnect?: ConnectCallback;
     onError?: ErrorCallback;
-    onClose?: CloseCallback;
   };
 
   constructor(urlOrConnectOptions?: string | ConnectOptions, socketOptions?: Record<string, unknown>) {
@@ -80,7 +76,7 @@ export default class ElmerConnectionImpl implements ElmerConnection {
     autoBind(this);
   }
 
-  async connect(): Promise<void> {
+  async connect(failOnError = true): Promise<void> {
     this.timeout = null;
     const { protocol, hostname, port, reconnectInterval, reconnectNumAttempts } = this.connectOptions;
 
@@ -90,13 +86,17 @@ export default class ElmerConnectionImpl implements ElmerConnection {
       this.connection = await amqp.connect(this.connectOptions, this.socketOptions);
       this.connected = true;
     } catch (e) {
-      if (!this.timeout) {
+      if (!this.timeout && !failOnError) {
         yall.error(`Connection failed, attempting again in ${reconnectInterval}ms...`);
-        this.timeout = setTimeout(() => this.connect(), reconnectInterval);
+        this.timeout = setTimeout(() => this.connect(false), reconnectInterval);
       }
       if (this.reconnectAttempts >= reconnectNumAttempts) {
         yall.error(`Could not reconnect in ${reconnectNumAttempts} tries, aborting...`);
         this.callbacks.onError?.(`Could not reconnect in ${reconnectNumAttempts} tries`);
+      }
+      if (failOnError) {
+        yall.error('Could not connect');
+        throw e;
       }
       return;
     }
@@ -118,7 +118,7 @@ export default class ElmerConnectionImpl implements ElmerConnection {
       }
       if (!this.timeout) {
         yall.error('Connection closed, reconnecting...');
-        this.timeout = setTimeout(() => this.connect(), reconnectInterval);
+        this.timeout = setTimeout(() => this.connect(false), reconnectInterval);
       }
       if (this.reconnectAttempts >= reconnectNumAttempts) {
         yall.warn(`Could not reconnect in ${reconnectNumAttempts} tries, aborting...`);
@@ -132,8 +132,6 @@ export default class ElmerConnectionImpl implements ElmerConnection {
 
     // replay model
     await this.replayModel();
-
-    this.callbacks.onConnect?.();
   }
 
   async close(): Promise<void> {
@@ -142,7 +140,6 @@ export default class ElmerConnectionImpl implements ElmerConnection {
     if (this.connected) {
       await this.connection?.close();
     }
-    this.callbacks.onClose?.();
   }
 
   private async replayModel(): Promise<void> {
@@ -187,16 +184,8 @@ export default class ElmerConnectionImpl implements ElmerConnection {
   // Public callback assignments for client
   //
 
-  onConnect(callback: ConnectCallback): void {
-    this.callbacks.onConnect = callback;
-  }
-
   onError(callback: ErrorCallback): void {
     this.callbacks.onError = callback;
-  }
-
-  onClose(callback: CloseCallback): void {
-    this.callbacks.onClose = callback;
   }
 
   //

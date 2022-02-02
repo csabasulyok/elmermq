@@ -9,6 +9,9 @@ import { MyDto } from './dto';
     poolSize: 4,
   });
 
+  // exit on error
+  conn.onError(() => process.exit());
+
   await conn.assertQueue('my_queue');
   await conn.assertExchange('my_fanout', 'fanout');
 
