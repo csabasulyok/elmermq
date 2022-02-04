@@ -103,7 +103,7 @@ export default class ElmerConnectionImpl implements ElmerConnection {
       }
       if (failOnError) {
         yall.error('Could not connect');
-        throw e;
+        this.callbacks.onError?.(`Could not start first AMQP connection to ${protocol}://${hostname}:${port}`);
       }
       return;
     }
