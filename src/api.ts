@@ -68,7 +68,7 @@ class ExtolConnectOptions extends WithExtolProps<ConnectOptions> {
   @extol('guest')
   username: string;
 
-  @extol('guest')
+  @extol('guest', { fileVariant: true })
   password: string;
 }
 
