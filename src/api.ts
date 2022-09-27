@@ -80,7 +80,11 @@ export const extolConnectOptions = new ExtolConnectOptions().extolProps();
 //
 export type ErrorCallback = (message: string) => void;
 // eslint-disable-next-line no-use-before-define
-export type MessageCallback<T> = (message: T, connection: ElmerConnection, rawMessage?: ConsumeMessage) => Promise<void> | void;
+export type MessageCallback<T> = (
+  message: T,
+  connection: ElmerConnection,
+  rawMessage?: ConsumeMessage,
+) => Promise<void> | void;
 export type ChannelMessageCallback<T> = (message: T, rawMessage?: ConsumeMessage) => Promise<void> | void;
 
 //
@@ -145,11 +149,26 @@ export default interface ElmerConnection {
   assertExchange(exchange: string, type: string, options?: Options.AssertExchange): Promise<Replies.AssertExchange>;
   deleteExchange(exchange: string, options?: Options.DeleteExchange): Promise<Replies.Empty>;
 
-  bindExchange(destination: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty>;
-  unbindExchange(destination: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty>;
+  bindExchange(
+    destination: string,
+    source: string,
+    pattern: string,
+    args?: Record<string, unknown>,
+  ): Promise<Replies.Empty>;
+  unbindExchange(
+    destination: string,
+    source: string,
+    pattern: string,
+    args?: Record<string, unknown>,
+  ): Promise<Replies.Empty>;
 
   consumeQueue<T>(queue: string, callback: MessageCallback<T>, options?: ConsumeOptions): Promise<string>;
-  consume<T>(exchange: string, pattern: string, callback: MessageCallback<T>, options?: ExclusiveConsumeOptions): Promise<string>;
+  consume<T>(
+    exchange: string,
+    pattern: string,
+    callback: MessageCallback<T>,
+    options?: ExclusiveConsumeOptions,
+  ): Promise<string>;
   sendToQueue<T>(queue: string, message: T, options?: PublishOptions): boolean;
   publish<T>(exchange: string, routingKey: string, message: T, options?: PublishOptions): boolean;
 

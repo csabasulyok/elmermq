@@ -89,7 +89,8 @@ export default class ElmerConnectionImpl implements ElmerConnection {
 
     try {
       this.reconnectAttempts += 1;
-      yall.info(`Connecting to AMQP broker on ${protocol}://${hostname}:${port} (attempt ${this.reconnectAttempts})...`);
+      const url = `${protocol}://${hostname}:${port}`;
+      yall.info(`Connecting to AMQP broker on ${url} (attempt ${this.reconnectAttempts})...`);
       this.connection = await amqp.connect(this.connectOptions, this.socketOptions);
       this.connected = true;
     } catch (e) {
@@ -211,19 +212,33 @@ export default class ElmerConnectionImpl implements ElmerConnection {
     return ret;
   }
 
-  async bindQueue(queue: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty> {
+  async bindQueue(
+    queue: string,
+    source: string,
+    pattern: string,
+    args?: Record<string, unknown>,
+  ): Promise<Replies.Empty> {
     this.model.bindQueue(queue, source, pattern, args);
     const ret = await this.channelPool.bindQueue(queue, source, pattern, args);
     return ret;
   }
 
-  async unbindQueue(queue: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty> {
+  async unbindQueue(
+    queue: string,
+    source: string,
+    pattern: string,
+    args?: Record<string, unknown>,
+  ): Promise<Replies.Empty> {
     this.model.unbindQueue(queue, source, pattern);
     const ret = await this.channelPool.unbindQueue(queue, source, pattern, args);
     return ret;
   }
 
-  async assertExchange(exchange: string, type: string, options?: Options.AssertExchange): Promise<Replies.AssertExchange> {
+  async assertExchange(
+    exchange: string,
+    type: string,
+    options?: Options.AssertExchange,
+  ): Promise<Replies.AssertExchange> {
     this.model.assertExchange(exchange, type, options);
     const ret = await this.channelPool.assertExchange(exchange, type, options);
     return ret;
@@ -235,13 +250,23 @@ export default class ElmerConnectionImpl implements ElmerConnection {
     return ret;
   }
 
-  async bindExchange(destination: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty> {
+  async bindExchange(
+    destination: string,
+    source: string,
+    pattern: string,
+    args?: Record<string, unknown>,
+  ): Promise<Replies.Empty> {
     this.model.bindExchange(destination, source, pattern, args);
     const ret = await this.channelPool.bindExchange(destination, source, pattern, args);
     return ret;
   }
 
-  async unbindExchange(destination: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty> {
+  async unbindExchange(
+    destination: string,
+    source: string,
+    pattern: string,
+    args?: Record<string, unknown>,
+  ): Promise<Replies.Empty> {
     this.model.unbindExchange(destination, source, pattern);
     const ret = await this.channelPool.unbindExchange(destination, source, pattern, args);
     return ret;
@@ -252,14 +277,21 @@ export default class ElmerConnectionImpl implements ElmerConnection {
   //
 
   async consumeQueue<T>(queue: string, callback: MessageCallback<T>, options?: ConsumeOptions): Promise<string> {
-    const decoratedCallback: ChannelMessageCallback<T> = (message: T, rawMessage?: ConsumeMessage) => callback(message, this, rawMessage);
+    const decoratedCallback: ChannelMessageCallback<T> = (message: T, rawMessage?: ConsumeMessage) =>
+      callback(message, this, rawMessage);
     const channelPoolSubscription = await this.channelPool.consumeQueue(queue, decoratedCallback, options);
     const subscriptionId = this.model.consumeQueue(channelPoolSubscription, queue, decoratedCallback, options);
     return subscriptionId;
   }
 
-  async consume<T>(exchange: string, pattern: string, callback: MessageCallback<T>, options?: ExclusiveConsumeOptions): Promise<string> {
-    const decoratedCallback: ChannelMessageCallback<T> = (message: T, rawMessage?: ConsumeMessage) => callback(message, this, rawMessage);
+  async consume<T>(
+    exchange: string,
+    pattern: string,
+    callback: MessageCallback<T>,
+    options?: ExclusiveConsumeOptions,
+  ): Promise<string> {
+    const decoratedCallback: ChannelMessageCallback<T> = (message: T, rawMessage?: ConsumeMessage) =>
+      callback(message, this, rawMessage);
     const channelPoolSubscription = await this.channelPool.consume(exchange, pattern, decoratedCallback, options);
     const subscriptionId = this.model.consume(channelPoolSubscription, exchange, pattern, decoratedCallback, options);
     return subscriptionId;

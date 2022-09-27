@@ -49,17 +49,31 @@ export default class ChannelWrapper {
     return ret;
   }
 
-  async bindQueue(queue: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty> {
+  async bindQueue(
+    queue: string,
+    source: string,
+    pattern: string,
+    args?: Record<string, unknown>,
+  ): Promise<Replies.Empty> {
     const ret = await this.channel.bindQueue(queue, source, pattern, args);
     return ret;
   }
 
-  async unbindQueue(queue: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty> {
+  async unbindQueue(
+    queue: string,
+    source: string,
+    pattern: string,
+    args?: Record<string, unknown>,
+  ): Promise<Replies.Empty> {
     const ret = await this.channel.unbindQueue(queue, source, pattern, args);
     return ret;
   }
 
-  async assertExchange(exchange: string, type: string, options?: Options.AssertExchange): Promise<Replies.AssertExchange> {
+  async assertExchange(
+    exchange: string,
+    type: string,
+    options?: Options.AssertExchange,
+  ): Promise<Replies.AssertExchange> {
     const ret = await this.channel.assertExchange(exchange, type, options);
     return ret;
   }
@@ -69,12 +83,22 @@ export default class ChannelWrapper {
     return ret;
   }
 
-  async bindExchange(destination: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty> {
+  async bindExchange(
+    destination: string,
+    source: string,
+    pattern: string,
+    args?: Record<string, unknown>,
+  ): Promise<Replies.Empty> {
     const ret = await this.channel.bindExchange(destination, source, pattern, args);
     return ret;
   }
 
-  async unbindExchange(destination: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty> {
+  async unbindExchange(
+    destination: string,
+    source: string,
+    pattern: string,
+    args?: Record<string, unknown>,
+  ): Promise<Replies.Empty> {
     const ret = await this.channel.unbindExchange(destination, source, pattern, args);
     return ret;
   }
@@ -83,7 +107,11 @@ export default class ChannelWrapper {
   // Common convenience method for processing a message
   //
 
-  private async addConsumer<T>(queue: string, callback: ChannelMessageCallback<T>, options?: ConsumeOptions): Promise<Replies.Consume> {
+  private async addConsumer<T>(
+    queue: string,
+    callback: ChannelMessageCallback<T>,
+    options?: ConsumeOptions,
+  ): Promise<Replies.Consume> {
     const response = await this.channel.consume(
       queue,
       async (message: ConsumeMessage) => {

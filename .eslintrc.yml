@@ -18,7 +18,7 @@ plugins:
   - '@typescript-eslint'
   - prettier
 rules:
-  semi: ['error', 'always']
+  semi: 0
   quotes: ['error', 'single']
   no-multi-spaces: 0
   no-param-reassign: 0
@@ -39,15 +39,16 @@ rules:
   import/extensions: ['error', { 'ts': 'never' }]
   import/no-unresolved: error
   lines-between-class-members: ['error', 'always', { 'exceptAfterSingleLine': true }]
-  '@typescript-eslint/no-use-before-define': ['error']
   arrow-body-style: 0
   import/prefer-default-export: 0
   no-trailing-spaces: ['error', { 'skipBlankLines': true, 'ignoreComments': true }]
   camelcase: error
   spaced-comment: error
   no-duplicate-imports: error
-  '@typescript-eslint/lines-between-class-members': 0
   react/jsx-filename-extension: 0
+  '@typescript-eslint/no-use-before-define': ['error']
+  '@typescript-eslint/lines-between-class-members': 0
+  '@typescript-eslint/semi': ['error']
 settings:
   import/parsers:
     '@typescript-eslint/parser':

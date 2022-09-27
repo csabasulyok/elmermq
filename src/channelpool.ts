@@ -74,17 +74,31 @@ export default class ChannelPool {
     return ret;
   }
 
-  async bindQueue(queue: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty> {
+  async bindQueue(
+    queue: string,
+    source: string,
+    pattern: string,
+    args?: Record<string, unknown>,
+  ): Promise<Replies.Empty> {
     const ret = await this.getChannel().bindQueue(queue, source, pattern, args);
     return ret;
   }
 
-  async unbindQueue(queue: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty> {
+  async unbindQueue(
+    queue: string,
+    source: string,
+    pattern: string,
+    args?: Record<string, unknown>,
+  ): Promise<Replies.Empty> {
     const ret = await this.getChannel().unbindQueue(queue, source, pattern, args);
     return ret;
   }
 
-  async assertExchange(exchange: string, type: string, options?: Options.AssertExchange): Promise<Replies.AssertExchange> {
+  async assertExchange(
+    exchange: string,
+    type: string,
+    options?: Options.AssertExchange,
+  ): Promise<Replies.AssertExchange> {
     const ret = await this.getChannel().assertExchange(exchange, type, options);
     return ret;
   }
@@ -94,12 +108,22 @@ export default class ChannelPool {
     return ret;
   }
 
-  async bindExchange(destination: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty> {
+  async bindExchange(
+    destination: string,
+    source: string,
+    pattern: string,
+    args?: Record<string, unknown>,
+  ): Promise<Replies.Empty> {
     const ret = await this.getChannel().bindExchange(destination, source, pattern, args);
     return ret;
   }
 
-  async unbindExchange(destination: string, source: string, pattern: string, args?: Record<string, unknown>): Promise<Replies.Empty> {
+  async unbindExchange(
+    destination: string,
+    source: string,
+    pattern: string,
+    args?: Record<string, unknown>,
+  ): Promise<Replies.Empty> {
     const ret = await this.getChannel().unbindExchange(destination, source, pattern, args);
     return ret;
   }
@@ -108,7 +132,11 @@ export default class ChannelPool {
   // consuming messages
   //
 
-  async consumeQueue<T>(queue: string, callback: ChannelMessageCallback<T>, options?: ConsumeOptions): Promise<ChannelPoolSubscription> {
+  async consumeQueue<T>(
+    queue: string,
+    callback: ChannelMessageCallback<T>,
+    options?: ConsumeOptions,
+  ): Promise<ChannelPoolSubscription> {
     const channel = this.getChannel();
     const consumerTag = await channel.consumeQueue(queue, callback, options);
     return { channelName: channel.name, consumerTag };
@@ -125,7 +153,7 @@ export default class ChannelPool {
     return { channelName: channel.name, consumerTag };
   }
 
-  async cancel(subscription: ChannelPoolSubscription): Promise<void> {
+  cancel(subscription: ChannelPoolSubscription): Promise<void> {
     const channel = this.channels[subscription.channelName];
     return channel?.cancel(subscription.consumerTag);
   }

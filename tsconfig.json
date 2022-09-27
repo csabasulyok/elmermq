@@ -13,7 +13,7 @@
     "forceConsistentCasingInFileNames": true,
     "importHelpers": false,
     "incremental": true,
-    "isolatedModules": true,
+    "isolatedModules": false,
     "lib": [
       "ScriptHost",
       "ES2020"

@@ -1,9 +1,9 @@
 import connect from './factory';
 import ElmerConnection from './api';
 import ChannelPool from './channelpool';
+import ChannelWrapper from './channelwrapper';
 
 export * from './api';
-export * from './channelwrapper';
 
-export { ElmerConnection, ChannelPool };
+export { ElmerConnection, ChannelPool, ChannelWrapper };
 export default connect;
