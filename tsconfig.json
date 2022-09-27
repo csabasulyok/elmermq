@@ -44,7 +44,7 @@
     "types": [
       "node"
     ],
-    "useDefineForClassFields": true
+    "useDefineForClassFields": false
   },
   "include": [
     "src/**/*.ts",
