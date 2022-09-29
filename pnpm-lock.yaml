@@ -19,13 +19,13 @@ specifiers:
   rimraf: 3.0.2
   ts-node: 10.9.1
   typescript: 4.8.3
-  yall2: 1.2.1
+  yall2: 1.2.2
 
 dependencies:
   amqplib: 0.10.3
   auto-bind: 4.0.0
   extol: 1.2.3
-  yall2: 1.2.1
+  yall2: 1.2.2
 
 devDependencies:
   '@types/amqplib': 0.8.2
@@ -2462,8 +2462,8 @@ packages:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
     dev: true
 
-  /yall2/1.2.1:
-    resolution: {integrity: sha512-YO0X4msdeDt+DbMtKD083Rs34D73UMqyDuBQe3WwxTk6giQw2KGU1Vv2XD3Xw75P19mLk8+AQj7x2SeFYRWXbw==}
+  /yall2/1.2.2:
+    resolution: {integrity: sha512-Cbm0t4qvzIgrfDadwm2rCZqOWqVvGqEvjvKnWMpRZgFfKOTzqmtywfy2rWq3aVxETfreIzjr64haSrPFW6VXTA==}
     dependencies:
       auto-bind: 4.0.0
       axios: 0.27.2

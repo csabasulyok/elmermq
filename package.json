@@ -1,6 +1,6 @@
 {
   "name": "elmermq",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Hunting the RabbitMQ - amqplib wrapper with auto-reconnect and channel pooling",
   "author": "Csaba Sulyok <csaba.sulyok@gmail.com>",
   "license": "ISC",
@@ -31,7 +31,7 @@
     "amqplib": "0.10.3",
     "auto-bind": "4.0.0",
     "extol": "1.2.3",
-    "yall2": "1.2.1"
+    "yall2": "1.2.2"
   },
   "devDependencies": {
     "@types/amqplib": "0.8.2",
