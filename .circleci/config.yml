@@ -5,7 +5,7 @@ jobs:
   lint:
     working_directory: ~/repo
     docker:
-      - image: csabasulyok/pnpm:16.17.0-alpine
+      - image: csabasulyok/pnpm:8.10.0-node18-alpine
     steps:
       - checkout
 
@@ -20,7 +20,7 @@ jobs:
           command: pnpm i
       - run:
           name: Run linters & compile
-          command: pnpm ci
+          command: pnpm run ci
 
       - save_cache:
           paths:
@@ -36,7 +36,7 @@ jobs:
   publish:
     working_directory: ~/repo
     docker:
-      - image: csabasulyok/pnpm:16.17.0-alpine
+      - image: csabasulyok/pnpm:8.10.0-node18-alpine
     steps:
       - checkout
 
@@ -67,14 +67,13 @@ jobs:
             - '.'
 
 workflows:
-  lint:
+  lint-and-publish-workflow:
     jobs:
       - lint
-  publish:
-    jobs:
       - publish:
+          context: npm-registry
+          requires:
+            - lint
           filters:
-            tags:
-              only: /^v.*/
             branches:
-              ignore: /.*/
+              only: main
