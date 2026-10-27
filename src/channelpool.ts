@@ -1,9 +1,9 @@
-import { Connection, Options, Replies } from 'amqplib';
+import { ChannelModel, Options, Replies } from 'amqplib';
 import yall from 'yall2';
 import autoBind from 'auto-bind';
-import ChannelWrapper from './channelwrapper';
-import id from './util';
-import { ChannelMessageCallback, ConsumeOptions, ExclusiveConsumeOptions, PublishOptions } from './api';
+import ChannelWrapper from './channelwrapper.js';
+import id from './util.js';
+import { ChannelMessageCallback, ConsumeOptions, ExclusiveConsumeOptions, PublishOptions } from './api.js';
 
 /**
  * Return key so that client can refer to a subscription of certain channel
@@ -17,7 +17,7 @@ export type ChannelPoolSubscription = {
  * Round-robin channel pool for an AMQP connection
  */
 export default class ChannelPool {
-  private connection: Connection;
+  private connection: ChannelModel;
   private poolSize: number;
   private channelNames: string[];
   private channels: Record<string, ChannelWrapper>; // round-robin channel pool
@@ -32,7 +32,7 @@ export default class ChannelPool {
     autoBind(this);
   }
 
-  async connect(connection: Connection): Promise<void> {
+  async connect(connection: ChannelModel): Promise<void> {
     this.connection = connection;
     this.channelCounter = 0;
     this.outgoingChannels = {};
@@ -54,7 +54,7 @@ export default class ChannelPool {
   }
 
   private getOutgoingChannel(exchange: string): ChannelWrapper {
-    if (!(exchange in this.outgoingChannels)) {
+    if (!Object.hasOwn(this.outgoingChannels, exchange)) {
       this.outgoingChannels[exchange] = this.getChannel();
     }
     return this.outgoingChannels[exchange];

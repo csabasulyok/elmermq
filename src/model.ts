@@ -1,9 +1,9 @@
 import { Options } from 'amqplib';
 import yall from 'yall2';
-import id from './util';
-import { ChannelMessageCallback, ConsumeOptions, ExclusiveConsumeOptions, PublishOptions } from './api';
-import FifoQueue from './queue';
-import { ChannelPoolSubscription } from './channelpool';
+import id from './util.js';
+import { ChannelMessageCallback, ConsumeOptions, ExclusiveConsumeOptions, PublishOptions } from './api.js';
+import FifoQueue from './queue.js';
+import { ChannelPoolSubscription } from './channelpool.js';
 
 //
 // declarative representations of subscriptions
@@ -48,7 +48,7 @@ type Binding = {
   destination: string;
   source: string;
   pattern: string;
-  args: Record<string, unknown>;
+  args?: Record<string, unknown>;
 };
 
 type BindingKey = [string, string];
@@ -125,7 +125,7 @@ export default class RabbitModel {
 
   bindQueue(queue: string, source: string, pattern: string, args?: Record<string, unknown>): void {
     this.assertQueueInModel(queue);
-    this.queues.get(queue).bindings.set([source, pattern], {
+    this.queues.get(queue)!.bindings.set([source, pattern], {
       destination: queue,
       source,
       pattern,
@@ -167,7 +167,7 @@ export default class RabbitModel {
 
   bindExchange(destination: string, source: string, pattern: string, args?: Record<string, unknown>): void {
     this.assertExchangeInModel(destination);
-    this.exchanges.get(destination).bindings.set([source, pattern], {
+    this.exchanges.get(destination)!.bindings.set([source, pattern], {
       destination,
       source,
       pattern,
@@ -200,7 +200,7 @@ export default class RabbitModel {
     } as QueueSubscription<T>;
 
     this.assertQueueInModel(queue);
-    this.queues.get(queue).subscriptions.set(subscriptionId, subscription);
+    this.queues.get(queue)!.subscriptions.set(subscriptionId, subscription);
     this.subscriptions.set(subscriptionId, subscription);
     return subscriptionId;
   }
@@ -224,7 +224,7 @@ export default class RabbitModel {
     } as ExchangeSubscription<T>;
 
     this.assertExchangeInModel(exchange);
-    this.exchanges.get(exchange).subscriptions.set(subscriptionId, subscription);
+    this.exchanges.get(exchange)!.subscriptions.set(subscriptionId, subscription);
     this.subscriptions.set(subscriptionId, subscription);
     return subscriptionId;
   }
@@ -234,16 +234,16 @@ export default class RabbitModel {
   //
 
   isSubscriptionActive(subscriptionId: string): boolean {
-    return this.subscriptions.get(subscriptionId)?.active;
+    return this.subscriptions.get(subscriptionId)?.active ?? false;
   }
 
-  pauseSubscription(subscriptionId: string): ChannelPoolSubscription {
+  pauseSubscription(subscriptionId: string): ChannelPoolSubscription | undefined {
     if (!this.subscriptions.has(subscriptionId)) {
       yall.warn(`Trying to pause non-existent subscription ${subscriptionId}`);
       return undefined;
     }
 
-    const subscription = this.subscriptions.get(subscriptionId);
+    const subscription = this.subscriptions.get(subscriptionId)!;
     yall.info(`Unsubscribing from ${subscription.source} (ID ${subscriptionId})`);
     subscription.active = false;
     return subscription.channelPoolSubscription;
@@ -255,24 +255,24 @@ export default class RabbitModel {
       return;
     }
 
-    const subscription = this.subscriptions.get(subscriptionId);
+    const subscription = this.subscriptions.get(subscriptionId)!;
     yall.info(`Resubscribing to ${subscription.source}`);
     subscription.active = true;
     subscription.channelPoolSubscription = channelPoolSubscription;
   }
 
-  cancelSubscription(subscriptionId: string): ChannelPoolSubscription {
+  cancelSubscription(subscriptionId: string): ChannelPoolSubscription | undefined {
     if (!this.subscriptions.has(subscriptionId)) {
       yall.warn(`Trying to cancel non-existent subscription ${subscriptionId}`);
       return undefined;
     }
 
-    const subscription = this.subscriptions.get(subscriptionId);
+    const subscription = this.subscriptions.get(subscriptionId)!;
     const { source, active } = subscription;
 
     yall.info(`Unsubscribing from ${source}`);
 
-    let channelPoolSubscription: ChannelPoolSubscription;
+    let channelPoolSubscription: ChannelPoolSubscription | undefined;
     if (active) {
       channelPoolSubscription = subscription.channelPoolSubscription;
     } else {
@@ -296,6 +296,6 @@ export default class RabbitModel {
 
   publish<T>(exchange: string, routingKey: string, message: T, options?: PublishOptions): void {
     this.assertExchangeInModel(exchange);
-    this.exchanges.get(exchange).backedUpQueue.push({ exchange, routingKey, message, options });
+    this.exchanges.get(exchange)!.backedUpQueue.push({ exchange, routingKey, message, options });
   }
 }

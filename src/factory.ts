@@ -1,5 +1,5 @@
-import ElmerConnection, { ConnectOptions } from './api';
-import ElmerConnectionImpl from './connection';
+import ElmerConnection, { ConnectOptions } from './api.js';
+import ElmerConnectionImpl from './connection.js';
 
 /**
  * Build AMQP connection with channel pooling and auto-reconnect

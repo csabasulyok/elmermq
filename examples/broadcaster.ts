@@ -1,45 +1,44 @@
-import connect from '../src';
-import { MyDto } from './dto';
+import connect from '../src/index.js';
+import { MyDto } from './dto.js';
 
-(async () => {
-  // connect with same parameters as amqplib
-  // with added channel count for pool
-  const conn = await connect({
-    hostname: 'localhost',
-    poolSize: 4,
-  });
+// connect with same parameters as amqplib
+// with added channel count for pool
+const conn = await connect({
+  hostname: 'localhost',
+  poolSize: 4,
+});
 
-  // assertions directly through connection
-  // use channel pool in the background
-  await conn.assertQueue('my_queue');
-  await conn.assertExchange('my_fanout', 'fanout');
+// assertions directly through connection
+// use channel pool in the background
+await conn.assertQueue('my_queue');
+await conn.assertExchange('my_fanout', 'fanout');
 
-  let queueIdx = 0;
-  setInterval(() => {
-    const message: MyDto = {
-      idx: queueIdx,
-      name: 'Hello to queue',
-      age: 42,
-      date: new Date(),
-    };
-    queueIdx += 1;
+// message counters
+const counters = { queue: 0, fanout: 1000 };
 
-    // automatic JSON serialization when publishing
-    conn.sendToQueue('my_queue', message);
-    console.log('my_queue <-', message.idx, message.date);
-  }, 2000);
+setInterval(() => {
+  const message: MyDto = {
+    idx: counters.queue,
+    name: 'Hello to queue',
+    age: 42,
+    date: new Date(),
+  };
+  counters.queue += 1;
 
-  let fanoutIdx = 1000;
-  setInterval(() => {
-    const message: MyDto = {
-      idx: fanoutIdx,
-      name: 'Hello to fanout',
-      age: 42,
-      date: new Date(),
-    };
-    fanoutIdx += 1;
+  // automatic JSON serialization when publishing
+  conn.sendToQueue('my_queue', message);
+  console.log('my_queue <-', message.idx, message.date);
+}, 2000);
 
-    conn.publish('my_fanout', undefined, message);
-    console.log('my_fanout <-', message.idx, message.date);
-  }, 7500);
-})();
+setInterval(() => {
+  const message: MyDto = {
+    idx: counters.fanout,
+    name: 'Hello to fanout',
+    age: 42,
+    date: new Date(),
+  };
+  counters.fanout += 1;
+
+  conn.publish('my_fanout', '', message);
+  console.log('my_fanout <-', message.idx, message.date);
+}, 7500);

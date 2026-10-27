@@ -1,8 +1,8 @@
-import { Connection, Channel, ConsumeMessage, Options, Replies } from 'amqplib';
+import { ChannelModel, Channel, ConsumeMessage, Options, Replies } from 'amqplib';
 import yall from 'yall2';
 import autoBind from 'auto-bind';
-import { ConsumeOptions, ChannelMessageCallback, PublishOptions, ExclusiveConsumeOptions } from './api';
-import id from './util';
+import { ConsumeOptions, ChannelMessageCallback, PublishOptions, ExclusiveConsumeOptions } from './api.js';
+import id from './util.js';
 
 /**
  * Wrapper around AMQP channel
@@ -18,19 +18,19 @@ export default class ChannelWrapper {
     autoBind(this);
   }
 
-  async connect(connection: Connection): Promise<void> {
+  async connect(connection: ChannelModel): Promise<void> {
     this.channel = await connection.createChannel();
-    this.channel.prefetch(1);
+    await this.channel.prefetch(1);
   }
 
   async close(): Promise<void> {
     try {
       // close channel
       await this.channel.close();
-    } catch (err) {
+    } catch (error) {
       // channel already closing because the parent connection is, so it can be ignored
-      if (err?.message !== 'Channel closing') {
-        throw err;
+      if ((error as Error | undefined)?.message !== 'Channel closing') {
+        throw error;
       }
     }
   }
@@ -114,7 +114,7 @@ export default class ChannelWrapper {
   ): Promise<Replies.Consume> {
     const response = await this.channel.consume(
       queue,
-      async (message: ConsumeMessage) => {
+      async (message: ConsumeMessage | null) => {
         if (!message) {
           return;
         }
@@ -122,20 +122,14 @@ export default class ChannelWrapper {
         try {
           yall.debug(`[${queue}] consuming message of length ${message.content.length}`);
 
-          let body: T;
-          if (options?.raw) {
-            // if raw, pass buffer as is
-            body = message.content as unknown as T;
-          } else {
-            // deserialize JSON
-            body = JSON.parse(message.content.toString()) as T;
-          }
+          // if raw, pass buffer as is, otherwise deserialize JSON
+          const body = options?.raw ? (message.content as unknown as T) : (JSON.parse(message.content.toString()) as T);
           yall.debug(body);
 
           await callback(body, message);
           this.channel.ack(message);
-        } catch (e) {
-          yall.error(`[${queue}] error, ${e}`);
+        } catch (error) {
+          yall.error(`[${queue}] error, ${error}`);
           // console.error(e);
           this.channel.reject(message, false);
         }
@@ -163,6 +157,8 @@ export default class ChannelWrapper {
     options?: ExclusiveConsumeOptions,
   ): Promise<string> {
     // assert temporary queue with given parameters
+    // an empty prefix also falls back to the exchange name
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const queue = `${options?.queuePrefix || exchange}-${id()}`;
     await this.channel.assertQueue(queue, { exclusive: true, autoDelete: true });
     await this.channel.bindQueue(queue, exchange, pattern);
@@ -176,10 +172,9 @@ export default class ChannelWrapper {
   publish<T>(exchange: string, routingKey: string, message: T, options?: PublishOptions): boolean {
     const body = options?.raw ? (message as unknown as Buffer) : Buffer.from(JSON.stringify(message));
 
-    if (!exchange) {
-      return this.channel.sendToQueue(routingKey, body, options);
-    }
-    return this.channel.publish(exchange, routingKey, body, options);
+    return !exchange
+      ? this.channel.sendToQueue(routingKey, body, options)
+      : this.channel.publish(exchange, routingKey, body, options);
   }
 
   //
