@@ -6,7 +6,9 @@ Hunting the RabbitMQ - amqplib wrapper with auto-reconnect and channel pooling
 npm i elmermq
 ```
 
-*[ElmerMQ](https://github.com/csabasulyok/elmermq)* is a wrapper around [amqplib](https://amqp-node.github.io/amqplib/) with some added functionalities:
+> Since version 2, ElmerMQ is an ES module only (no CommonJS build), requires Node.js 24+ and is built on amqplib 2. Both `import connect from 'elmermq'` and `import { connect } from 'elmermq'` work.
+
+_[ElmerMQ](https://github.com/csabasulyok/elmermq)_ is a wrapper around [amqplib](https://amqp-node.github.io/amqplib/) with some added functionalities:
 
 - Auto-reconnect with auto-resubscribe to any queues
 - Channel pooling with round-robin selection
@@ -23,7 +25,7 @@ npm i elmermq
 | ELMERMQ_PORT                   | `number` | 5672          | Port of running RabbitMQ                       |
 | ELMERMQ_USERNAME               | `string` | `guest`       | Username for running RabbitMQ                  |
 | ELMERMQ_PASSWORD               | `string` | `guest`       | Password for running RabbitMQ                  |
-| ELMERMQ_PASSWORD_FILE          | `string` | *none*        | File variant of password                       |
+| ELMERMQ_PASSWORD_FILE          | `string` | _none_        | File variant of password                       |
 | ELMERMQ_CONNECTION_LABEL       | `string` | `elmermq`     | Connection label (shown in management console) |
 | ELMERMQ_RECONNECT_INTERVAL     | `number` | 5000          | Time in ms to delay when reconnecting          |
 | ELMERMQ_RECONNECT_NUM_ATTEMPTS | `number` | 10            | Number of retries when attempting reconnecting |

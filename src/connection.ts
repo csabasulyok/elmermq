@@ -1,9 +1,6 @@
-/* eslint-disable no-restricted-syntax */
-/* eslint-disable no-await-in-loop */
-import amqp, { Connection, Options, Replies, ConsumeMessage } from 'amqplib';
+import amqp, { ChannelModel, Options, Replies, ConsumeMessage } from 'amqplib';
 import yall from 'yall2';
 import autoBind from 'auto-bind';
-
 import ElmerConnection, {
   ChannelMessageCallback,
   ConnectOptions,
@@ -13,16 +10,16 @@ import ElmerConnection, {
   extolConnectOptions,
   MessageCallback,
   PublishOptions,
-} from './api';
-import ChannelPool, { ChannelPoolSubscription } from './channelpool';
-import RabbitModel from './model';
+} from './api.js';
+import ChannelPool, { ChannelPoolSubscription } from './channelpool.js';
+import RabbitModel from './model.js';
 
 export default class ElmerConnectionImpl implements ElmerConnection {
   // connection options
   private connectOptions: ConnectOptions;
   private socketOptions: Record<string, unknown>;
   // amqp objects
-  private connection: Connection;
+  private connection: ChannelModel;
   private channelPool: ChannelPool;
   private model: RabbitModel;
   private closeRequested: boolean;
@@ -40,8 +37,8 @@ export default class ElmerConnectionImpl implements ElmerConnection {
   constructor(urlOrConnectOptions?: string | ConnectOptions, socketOptions?: Record<string, unknown>) {
     let customConnectOptions: ConnectOptions;
 
-    if (typeof urlOrConnectOptions === 'string' || urlOrConnectOptions instanceof String) {
-      const url = new URL(urlOrConnectOptions as string);
+    if (typeof urlOrConnectOptions === 'string') {
+      const url = new URL(urlOrConnectOptions);
       customConnectOptions = {
         protocol: url.protocol || undefined,
         hostname: url.hostname || undefined,
@@ -51,7 +48,7 @@ export default class ElmerConnectionImpl implements ElmerConnection {
         vhost: url.pathname || undefined,
       };
     } else {
-      customConnectOptions = urlOrConnectOptions;
+      customConnectOptions = urlOrConnectOptions ?? {};
     }
 
     this.connectOptions = {
@@ -75,7 +72,7 @@ export default class ElmerConnectionImpl implements ElmerConnection {
       },
     };
 
-    this.channelPool = new ChannelPool(this.connectOptions.poolSize);
+    this.channelPool = new ChannelPool(this.connectOptions.poolSize!);
     this.model = new RabbitModel();
     this.closeRequested = false;
     this.connected = false;
@@ -84,8 +81,11 @@ export default class ElmerConnectionImpl implements ElmerConnection {
   }
 
   async connect(failOnError = true): Promise<void> {
-    this.timeout = null;
-    const { protocol, hostname, port, reconnectInterval, reconnectNumAttempts } = this.connectOptions;
+    this.timeout = undefined;
+    const { protocol, hostname, port } = this.connectOptions;
+    // always set, defaults come from extolConnectOptions
+    const reconnectInterval = this.connectOptions.reconnectInterval!;
+    const reconnectNumAttempts = this.connectOptions.reconnectNumAttempts!;
 
     try {
       this.reconnectAttempts += 1;
@@ -93,8 +93,8 @@ export default class ElmerConnectionImpl implements ElmerConnection {
       yall.info(`Connecting to AMQP broker on ${url} (attempt ${this.reconnectAttempts})...`);
       this.connection = await amqp.connect(this.connectOptions, this.socketOptions);
       this.connected = true;
-    } catch (e) {
-      if (!this.timeout && !failOnError) {
+    } catch {
+      if (!failOnError && !this.timeout) {
         yall.error(`Connection failed, attempting again in ${reconnectInterval}ms...`);
         this.timeout = setTimeout(() => this.connect(false), reconnectInterval);
       }
@@ -128,10 +128,11 @@ export default class ElmerConnectionImpl implements ElmerConnection {
         yall.error('Connection closed, reconnecting...');
         this.timeout = setTimeout(() => this.connect(false), reconnectInterval);
       }
-      if (this.reconnectAttempts >= reconnectNumAttempts) {
-        yall.warn(`Could not reconnect in ${reconnectNumAttempts} tries, aborting...`);
-        this.callbacks.onError?.(`Could not reconnect in ${reconnectNumAttempts} tries`);
+      if (this.reconnectAttempts < reconnectNumAttempts) {
+        return;
       }
+      yall.warn(`Could not reconnect in ${reconnectNumAttempts} tries, aborting...`);
+      this.callbacks.onError?.(`Could not reconnect in ${reconnectNumAttempts} tries`);
     });
 
     this.reconnectAttempts = 0;
@@ -154,7 +155,7 @@ export default class ElmerConnectionImpl implements ElmerConnection {
     // assert exchanges
     for (const exchange of this.model.exchanges.values()) {
       if (exchange.asserted) {
-        await this.channelPool.assertExchange(exchange.name, exchange.type, exchange.options);
+        await this.channelPool.assertExchange(exchange.name, exchange.type!, exchange.options);
       }
     }
     // assert queues
@@ -344,17 +345,18 @@ export default class ElmerConnectionImpl implements ElmerConnection {
 
   async resumeSubscription(subscriptionId: string): Promise<void> {
     const subscription = this.model.subscriptions.get(subscriptionId);
-    if (subscription && this.connected) {
-      let channelPoolSubscription: ChannelPoolSubscription;
-      if (subscription.type === 'queue') {
-        const { source, callback, options } = subscription;
-        channelPoolSubscription = await this.channelPool.consumeQueue(source, callback, options);
-      } else {
-        const { source, pattern, callback, options } = subscription;
-        channelPoolSubscription = await this.channelPool.consume(source, pattern, callback, options);
-      }
-      this.model.resumeSubscription(subscriptionId, channelPoolSubscription);
+    if (!subscription || !this.connected) {
+      return;
     }
+    let channelPoolSubscription: ChannelPoolSubscription;
+    if (subscription.type === 'queue') {
+      const { source, callback, options } = subscription;
+      channelPoolSubscription = await this.channelPool.consumeQueue(source, callback, options);
+    } else {
+      const { source, pattern, callback, options } = subscription;
+      channelPoolSubscription = await this.channelPool.consume(source, pattern, callback, options);
+    }
+    this.model.resumeSubscription(subscriptionId, channelPoolSubscription);
   }
 
   async cancelAllSubscriptions(): Promise<void> {

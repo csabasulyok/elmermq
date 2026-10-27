@@ -1,9 +1,6 @@
-import connect from './factory';
-import ElmerConnection from './api';
-import ChannelPool from './channelpool';
-import ChannelWrapper from './channelwrapper';
+export * from './api.js';
+export { type default as ElmerConnection } from './api.js';
+export { default as ChannelPool } from './channelpool.js';
+export { default as ChannelWrapper } from './channelwrapper.js';
 
-export * from './api';
-
-export { ElmerConnection, ChannelPool, ChannelWrapper };
-export default connect;
+export { default as connect, default } from './factory.js';

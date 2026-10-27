@@ -4,12 +4,11 @@ import extol, { extolPrefix, WithExtolProps } from 'extol';
 /**
  * re-export some amqplib types we also use in our API
  */
-export { Options, Replies, ConsumeMessage };
 
 /**
  * Extended version of amqplib connect options.
  */
-export interface ConnectOptions extends Options.Connect {
+export type ConnectOptions = {
   /**
    * Interval in milliseconds to try to reconnect and resubscribe
    * if the connection is lost.
@@ -35,7 +34,7 @@ export interface ConnectOptions extends Options.Connect {
    * Default: elmermq
    */
   connectionLabel?: string;
-}
+} & Options.Connect;
 
 /**
  * Default instance of connect options.
@@ -79,7 +78,7 @@ export const extolConnectOptions = new ExtolConnectOptions().extolProps();
 // Callback types
 //
 export type ErrorCallback = (message: string) => void;
-// eslint-disable-next-line no-use-before-define
+
 export type MessageCallback<T> = (
   message: T,
   connection: ElmerConnection,
@@ -122,7 +121,7 @@ export type PublishOptions = Options.Publish & {
  * A connection to the AMQP server.
  * Uses auto-reconnect and channel pooling.
  */
-export default interface ElmerConnection {
+type ElmerConnection = {
   //
   // Connection management
   //
@@ -180,4 +179,7 @@ export default interface ElmerConnection {
   pauseSubscription(subscriptionId: string): Promise<void>;
   resumeSubscription(subscriptionId: string): Promise<void>;
   cancelSubscription(subscriptionId: string): Promise<void>;
-}
+};
+export default ElmerConnection;
+
+export { type Options, type ConsumeMessage, type Replies } from 'amqplib';
