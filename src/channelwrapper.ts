@@ -1,7 +1,13 @@
 import { ChannelModel, Channel, ConsumeMessage, Options, Replies } from 'amqplib';
 import yall from 'yall2';
 import autoBind from 'auto-bind';
-import { ConsumeOptions, ChannelMessageCallback, PublishOptions, ExclusiveConsumeOptions } from './api.js';
+import {
+  ConsumeOptions,
+  ChannelMessageCallback,
+  PublishOptions,
+  ExclusiveConsumeOptions,
+  RequeueError,
+} from './api.js';
 import id from './util.js';
 
 /**
@@ -129,6 +135,11 @@ export default class ChannelWrapper {
           await callback(body, message);
           this.channel.ack(message);
         } catch (error) {
+          if (error instanceof RequeueError) {
+            yall.warn(`[${queue}] requeueing message, ${error.message}`);
+            this.channel.reject(message, true);
+            return;
+          }
           yall.error(`[${queue}] error, ${error}`);
           // console.error(e);
           this.channel.reject(message, false);
@@ -156,16 +167,28 @@ export default class ChannelWrapper {
     callback: ChannelMessageCallback<T>,
     options?: ExclusiveConsumeOptions,
   ): Promise<string> {
-    // assert temporary queue with given parameters
-    // an empty prefix also falls back to the exchange name
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    const queue = `${options?.queuePrefix || exchange}-${id()}`;
-    await this.channel.assertQueue(queue, { exclusive: true, autoDelete: true });
+    let queue: string;
+    if (options?.queueName) {
+      // named queue, outlives its consumers until it expires
+      queue = options.queueName;
+      await this.channel.assertQueue(queue, {
+        durable: false,
+        exclusive: false,
+        autoDelete: false,
+        ...options.queueOptions,
+      });
+    } else {
+      // assert temporary queue with given parameters
+      // an empty prefix also falls back to the exchange name
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+      queue = `${options?.queuePrefix || exchange}-${id()}`;
+      await this.channel.assertQueue(queue, { exclusive: true, autoDelete: true });
+    }
     await this.channel.bindQueue(queue, exchange, pattern);
     // build callback
     const { consumerTag } = await this.addConsumer(queue, callback, options);
 
-    yall.info(`Subscribed to exchange ${exchange}${pattern ? `:${pattern}` : ''} via temp queue ${queue}`);
+    yall.info(`Subscribed to exchange ${exchange}${pattern ? `:${pattern}` : ''} via queue ${queue}`);
     return consumerTag;
   }
 

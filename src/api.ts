@@ -106,7 +106,31 @@ export type ExclusiveConsumeOptions = ConsumeOptions & {
    * Default: the exchange name we route to the temporary queue
    */
   queuePrefix?: string;
+
+  /**
+   * Fixed queue name instead of a generated temporary one. Such a queue is not exclusive and not auto-deleted,
+   * so it keeps collecting messages while nobody consumes it (e.g. between reconnects of the same client),
+   * and it may have multiple consumers. Set queueOptions.expires so it is deleted once unused.
+   */
+  queueName?: string;
+
+  /**
+   * Options when asserting the queue given by queueName.
+   * Default: non-durable, non-exclusive, no auto-delete
+   */
+  queueOptions?: Options.AssertQueue;
 };
+
+/**
+ * Throw from a consume callback to put the message back into the queue instead of discarding it,
+ * e.g. when it could not be passed on yet. Other errors discard (reject) the message.
+ */
+export class RequeueError extends Error {
+  constructor(message?: string) {
+    super(message);
+    this.name = 'RequeueError';
+  }
+}
 
 export type PublishOptions = Options.Publish & {
   /**
